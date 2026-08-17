@@ -26,6 +26,8 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
     c.commit(); c.close()
 
+init_db()
+
 def whatsapp_configured():
     return bool(os.getenv("WHATSAPP_ACCESS_TOKEN") and os.getenv("WHATSAPP_PHONE_NUMBER_ID"))
 
