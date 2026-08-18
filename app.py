@@ -870,41 +870,124 @@ def webhook_receive():
                 # INCOMING MESSAGE
                 # =========================================
 
-                messages = value.get(
-                    "messages",
-                    []
-                )
+                @app.route("/incoming")
+def incoming():
 
-                for msg in messages:
+    c = db()
 
-                    wa_message_id = msg.get(
-                        "id"
-                    )
+    rows = c.execute("""
+        SELECT *
+        FROM whatsapp_incoming
+        ORDER BY id DESC
+        LIMIT 500
+    """).fetchall()
 
-                    sender = msg.get(
-                        "from"
-                    )
+    c.close()
 
-                    msg_type = msg.get(
-                        "type"
-                    )
+    return render_template(
+        "incoming.html",
+        rows=rows
+    )
 
-                    message_text = ""
 
-                    if msg_type == "text":
+# =========================================================
+# WEBHOOK LOG
+# =========================================================
 
-                        message_text = (
-                            msg.get(
-                                "text",
-                                {}
-                            ).get(
-                                "body",
-                                ""
-                            )
-                        )
+@app.route("/webhook/logs")
+def webhook_logs():
 
-                    elif msg_type == "button":
+    c = db()
 
-                        message_text = (
-                            msg.get(
-           
+    rows = c.execute("""
+        SELECT *
+        FROM webhook_events
+        ORDER BY id DESC
+        LIMIT 100
+    """).fetchall()
+
+    c.close()
+
+    return render_template(
+        "webhook_logs.html",
+        rows=rows
+    )
+
+
+# =========================================================
+# SETTINGS
+# =========================================================
+
+@app.route("/settings")
+def settings():
+
+    return render_template(
+        "settings.html",
+        config_ok=whatsapp_configured(),
+        webhook_token_ok=bool(
+            get_env("WEBHOOK_VERIFY_TOKEN")
+        ),
+        app_secret_ok=bool(
+            get_env("META_APP_SECRET")
+        )
+    )
+
+
+# =========================================================
+# API: WHATSAPP STATUS
+# =========================================================
+
+@app.route("/api/whatsapp/status")
+def whatsapp_status():
+
+    return jsonify({
+        "configured": whatsapp_configured(),
+        "phone_number_id": bool(
+            get_env("WHATSAPP_PHONE_NUMBER_ID")
+        ),
+        "access_token": bool(
+            get_env("WHATSAPP_ACCESS_TOKEN")
+        ),
+        "app_secret": bool(
+            get_env("META_APP_SECRET")
+        ),
+        "webhook_verify_token": bool(
+            get_env("WEBHOOK_VERIFY_TOKEN")
+        )
+    })
+
+
+# =========================================================
+# HEALTH CHECK
+# =========================================================
+
+@app.route("/health")
+def health():
+
+    return jsonify({
+        "status": "ok",
+        "whatsapp_configured": whatsapp_configured(),
+        "time": datetime.utcnow().isoformat()
+    })
+
+
+# =========================================================
+# RUN
+# =========================================================
+
+if __name__ == "__main__":
+
+    init_db()
+
+    port = int(
+        os.getenv(
+            "PORT",
+            "10000"
+        )
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=False
+    )
