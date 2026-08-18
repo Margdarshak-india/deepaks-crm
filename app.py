@@ -870,7 +870,220 @@ def webhook_receive():
                 # INCOMING MESSAGE
                 # =========================================
 
-                @app.route("/incoming")
+                messages = value.get(
+                    "messages",
+                    []
+                )
+
+                for msg in messages:
+
+                    wa_message_id = msg.get(
+                        "id"
+                    )
+
+                    sender = msg.get(
+                        "from"
+                    )
+
+                    msg_type = msg.get(
+                        "type"
+                    )
+
+                    message_text = ""
+
+                    if msg_type == "text":
+
+                        message_text = (
+                            msg.get(
+                                "text",
+                                {}
+                            ).get(
+                                "body",
+                                ""
+                            )
+                        )
+
+                    elif msg_type == "button":
+
+                        message_text = (
+                            msg.get(
+                                "button",
+                                {}
+                            ).get(
+                                "text",
+                                ""
+                            )
+                        )
+
+                    elif msg_type == "interactive":
+
+                        interactive = msg.get(
+                            "interactive",
+                            {}
+                        )
+
+                        if interactive.get(
+                            "type"
+                        ) == "button_reply":
+
+                            message_text = (
+                                interactive
+                                .get(
+                                    "button_reply",
+                                    {}
+                                )
+                                .get(
+                                    "title",
+                                    ""
+                                )
+                            )
+
+                        elif interactive.get(
+                            "type"
+                        ) == "list_reply":
+
+                            message_text = (
+                                interactive
+                                .get(
+                                    "list_reply",
+                                    {}
+                                )
+                                .get(
+                                    "title",
+                                    ""
+                                )
+                            )
+
+                    if wa_message_id:
+
+                        try:
+
+                            c.execute("""
+                                INSERT INTO whatsapp_incoming
+                                (
+                                    wa_message_id,
+                                    phone,
+                                    message_type,
+                                    message
+                                )
+                                VALUES (?, ?, ?, ?)
+                            """, (
+                                wa_message_id,
+                                sender,
+                                msg_type,
+                                message_text
+                            ))
+
+                        except sqlite3.IntegrityError:
+                            pass
+
+                    # =====================================
+                    # CONTACT AUTO CREATE
+                    # =====================================
+
+                    if sender:
+
+                        existing = c.execute("""
+                            SELECT id
+                            FROM contacts
+                            WHERE phone=?
+                        """, (
+                            clean_phone(sender),
+                        )).fetchone()
+
+                        if not existing:
+
+                            profile_name = "WhatsApp Customer"
+
+                            contacts_data = (
+                                value.get(
+                                    "contacts",
+                                    []
+                                )
+                            )
+
+                            if contacts_data:
+
+                                profile = contacts_data[0].get(
+                                    "profile",
+                                    {}
+                                )
+
+                                profile_name = (
+                                    profile.get(
+                                        "name"
+                                    )
+                                    or
+                                    "WhatsApp Customer"
+                                )
+
+                            try:
+
+                                c.execute("""
+                                    INSERT INTO contacts
+                                    (
+                                        name,
+                                        phone,
+                                        group_name
+                                    )
+                                    VALUES (?, ?, ?)
+                                """, (
+                                    profile_name,
+                                    clean_phone(sender),
+                                    "WhatsApp"
+                                ))
+
+                            except sqlite3.IntegrityError:
+                                pass
+
+        c.commit()
+        c.close()
+
+        return "EVENT_RECEIVED", 200
+
+    except Exception as e:
+
+        print(
+            "WEBHOOK ERROR:",
+            str(e)
+        )
+
+        return "EVENT_RECEIVED", 200
+
+
+# =========================================================
+# MESSAGE HISTORY
+# =========================================================
+
+@app.route("/messages")
+def messages():
+
+    c = db()
+
+    rows = c.execute("""
+        SELECT
+            wm.*,
+            c.name AS contact_name
+        FROM whatsapp_messages wm
+        LEFT JOIN contacts c
+            ON c.id = wm.contact_id
+        ORDER BY wm.id DESC
+        LIMIT 500
+    """).fetchall()
+
+    c.close()
+
+    return render_template(
+        "messages.html",
+        rows=rows
+    )
+
+
+# =========================================================
+# INCOMING MESSAGES
+# =========================================================
+
+@app.route("/incoming")
 def incoming():
 
     c = db()
