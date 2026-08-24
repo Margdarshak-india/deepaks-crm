@@ -1369,6 +1369,13 @@ def webhook_receive():
 # MESSAGE HISTORY
 # =========================================================
 
+@app.route("/messages-test")
+def messages_test():
+    return {
+        "status": "ok",
+        "message": "MESSAGES ROUTING WORKING"
+    }
+
 @app.route("/messages")
 def messages():
 
@@ -1421,6 +1428,13 @@ def incoming():
 # WEBHOOK LOGS
 # =========================================================
 
+@app.route("/webhook-test")
+def webhook_test():
+    return {
+        "status": "ok",
+        "message": "WEBHOOK ROUTING WORKING"
+    }
+    
 @app.route("/webhook/logs")
 def webhook_logs():
 
