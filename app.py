@@ -11,11 +11,25 @@ import hashlib
 import json
 from datetime import datetime
 
+
+# =========================================================
+# FLASK APP
+# =========================================================
+
 app = Flask(__name__)
+
 app.secret_key = os.getenv(
     "FLASK_SECRET_KEY",
     "change-this-secret-key"
 )
+
+
+# =========================================================
+# ENVIRONMENT HELPER
+# =========================================================
+
+def get_env(name):
+    return os.getenv(name, "").strip()
 
 
 # =========================================================
@@ -29,8 +43,8 @@ class DBWrapper:
 
     def execute(self, query, params=None):
 
-        # Existing CRM queries use SQLite-style ? placeholders.
-        # PostgreSQL uses %s.
+        # Convert old SQLite-style ? placeholders
+        # to PostgreSQL %s placeholders.
         query = query.replace("?", "%s")
 
         cursor = self.connection.cursor(
@@ -56,112 +70,163 @@ class DBWrapper:
 
 def db():
 
-    database_url = os.getenv("DATABASE_URL")
+    database_url = get_env("DATABASE_URL")
 
     if not database_url:
+
         raise RuntimeError(
             "DATABASE_URL is not configured in Render Environment."
         )
 
     connection = psycopg2.connect(
-        database_url
+        database_url,
+        connect_timeout=10
     )
 
     return DBWrapper(connection)
 
 
+# =========================================================
+# DATABASE INITIALIZATION
+# =========================================================
+
 def init_db():
 
-    c = db()
+    c = None
 
-    # =====================================================
-    # CONTACTS
-    # =====================================================
+    try:
 
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS contacts(
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL,
-            phone TEXT NOT NULL UNIQUE,
-            group_name TEXT DEFAULT 'General'
+        c = db()
+
+        # =====================================================
+        # CONTACTS
+        # =====================================================
+
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS contacts(
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                phone TEXT NOT NULL UNIQUE,
+                group_name TEXT DEFAULT 'General'
+            )
+        """)
+
+        # =====================================================
+        # CAMPAIGNS
+        # =====================================================
+
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS campaigns(
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                message TEXT NOT NULL,
+                group_name TEXT,
+                status TEXT DEFAULT 'Draft',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # =====================================================
+        # WHATSAPP MESSAGES
+        # =====================================================
+
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS whatsapp_messages(
+                id SERIAL PRIMARY KEY,
+                campaign_id INTEGER,
+                contact_id INTEGER,
+                phone TEXT,
+                message TEXT,
+                wa_message_id TEXT,
+                direction TEXT DEFAULT 'outgoing',
+                status TEXT DEFAULT 'queued',
+                error TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # =====================================================
+        # INCOMING WHATSAPP MESSAGES
+        # =====================================================
+
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS whatsapp_incoming(
+                id SERIAL PRIMARY KEY,
+                wa_message_id TEXT UNIQUE,
+                phone TEXT,
+                message_type TEXT,
+                message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # =====================================================
+        # WEBHOOK EVENTS
+        # =====================================================
+
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS webhook_events(
+                id SERIAL PRIMARY KEY,
+                event_type TEXT,
+                payload TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        c.commit()
+
+        print("DATABASE INITIALIZED SUCCESSFULLY")
+
+        return True
+
+    except Exception as e:
+
+        print(
+            "DATABASE INITIALIZATION ERROR:",
+            str(e)
         )
-    """)
 
-    # =====================================================
-    # CAMPAIGNS
-    # =====================================================
+        if c:
 
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS campaigns(
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL,
-            message TEXT NOT NULL,
-            group_name TEXT,
-            status TEXT DEFAULT 'Draft',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
+            try:
+                c.rollback()
+            except Exception:
+                pass
 
-    # =====================================================
-    # WHATSAPP MESSAGES
-    # =====================================================
+        return False
 
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS whatsapp_messages(
-            id SERIAL PRIMARY KEY,
-            campaign_id INTEGER,
-            contact_id INTEGER,
-            phone TEXT,
-            message TEXT,
-            wa_message_id TEXT,
-            direction TEXT DEFAULT 'outgoing',
-            status TEXT DEFAULT 'queued',
-            error TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
+    finally:
 
-    # =====================================================
-    # INCOMING WHATSAPP MESSAGES
-    # =====================================================
+        if c:
 
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS whatsapp_incoming(
-            id SERIAL PRIMARY KEY,
-            wa_message_id TEXT UNIQUE,
-            phone TEXT,
-            message_type TEXT,
-            message TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # =====================================================
-    # WEBHOOK EVENTS
-    # =====================================================
-
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS webhook_events(
-            id SERIAL PRIMARY KEY,
-            event_type TEXT,
-            payload TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    c.commit()
-    c.close()
+            try:
+                c.close()
+            except Exception:
+                pass
 
 
 # =========================================================
-# ENVIRONMENT VARIABLES
+# IMPORTANT FOR RENDER / GUNICORN
+# =========================================================
+#
+# Render normally starts Flask with:
+#
+# gunicorn app:app
+#
+# Therefore __main__ block does not execute.
+#
+# So database initialization must happen during
+# application import/startup.
+#
 # =========================================================
 
-def get_env(name):
+init_db()
 
-    return os.getenv(name, "").strip()
 
+# =========================================================
+# WHATSAPP ENVIRONMENT VARIABLES
+# =========================================================
 
 WHATSAPP_ACCESS_TOKEN = get_env(
     "WHATSAPP_ACCESS_TOKEN"
@@ -175,9 +240,10 @@ META_APP_SECRET = get_env(
     "META_APP_SECRET"
 )
 
-WEBHOOK_VERIFY_TOKEN = get_env(
-    "WEBHOOK_VERIFY_TOKEN"
-) or "margdarshak_webhook_2026"
+WEBHOOK_VERIFY_TOKEN = (
+    get_env("WEBHOOK_VERIFY_TOKEN")
+    or "margdarshak_webhook_2026"
+)
 
 
 def whatsapp_configured():
@@ -442,9 +508,7 @@ def send_whatsapp_template(
 
     if components:
 
-        payload["template"][
-            "components"
-        ] = components
+        payload["template"]["components"] = components
 
     try:
 
@@ -648,7 +712,7 @@ def contacts():
 
                 except IntegrityError:
 
-                    pass
+                    c.rollback()
 
         c.commit()
         c.close()
@@ -930,7 +994,7 @@ def send_campaign(cid):
 
 
 # =========================================================
-# WEBHOOK VERIFY - META GET REQUEST
+# WEBHOOK VERIFY
 # =========================================================
 
 @app.route(
@@ -963,7 +1027,7 @@ def webhook_verify():
 
 
 # =========================================================
-# WEBHOOK RECEIVE - META POST REQUEST
+# WEBHOOK RECEIVE
 # =========================================================
 
 @app.route(
@@ -993,7 +1057,9 @@ def webhook_receive():
 
         c = db()
 
-        # Save complete webhook event
+        # =====================================================
+        # SAVE COMPLETE WEBHOOK EVENT
+        # =====================================================
 
         c.execute("""
             INSERT INTO webhook_events
@@ -1029,9 +1095,9 @@ def webhook_receive():
                     {}
                 )
 
-                # =========================================
+                # =================================================
                 # MESSAGE STATUS
-                # =========================================
+                # =================================================
 
                 statuses = value.get(
                     "statuses",
@@ -1076,9 +1142,9 @@ def webhook_receive():
                             wa_id
                         ))
 
-                # =========================================
+                # =================================================
                 # INCOMING MESSAGE
-                # =========================================
+                # =================================================
 
                 messages = value.get(
                     "messages",
@@ -1132,13 +1198,9 @@ def webhook_receive():
                             {}
                         )
 
-                        if (
-                            interactive.get(
-                                "type"
-                            )
-                            ==
-                            "button_reply"
-                        ):
+                        if interactive.get(
+                            "type"
+                        ) == "button_reply":
 
                             message_text = (
                                 interactive
@@ -1152,13 +1214,9 @@ def webhook_receive():
                                 )
                             )
 
-                        elif (
-                            interactive.get(
-                                "type"
-                            )
-                            ==
-                            "list_reply"
-                        ):
+                        elif interactive.get(
+                            "type"
+                        ) == "list_reply":
 
                             message_text = (
                                 interactive
@@ -1172,7 +1230,9 @@ def webhook_receive():
                                 )
                             )
 
-                    # Save incoming message
+                    # =================================================
+                    # SAVE INCOMING MESSAGE
+                    # =================================================
 
                     if wa_message_id:
 
@@ -1196,11 +1256,11 @@ def webhook_receive():
 
                         except IntegrityError:
 
-                            pass
+                            c.rollback()
 
-                    # =====================================
-                    # CONTACT AUTO CREATE
-                    # =====================================
+                    # =================================================
+                    # AUTO CREATE CONTACT
+                    # =================================================
 
                     if sender:
 
@@ -1265,7 +1325,7 @@ def webhook_receive():
 
                             except IntegrityError:
 
-                                pass
+                                c.rollback()
 
         c.commit()
 
@@ -1288,6 +1348,8 @@ def webhook_receive():
             except Exception:
                 pass
 
+        # WhatsApp webhook should receive 200
+        # so it does not repeatedly retry.
         return (
             "EVENT_RECEIVED",
             200
@@ -1356,7 +1418,7 @@ def incoming():
 
 
 # =========================================================
-# WEBHOOK LOG
+# WEBHOOK LOGS
 # =========================================================
 
 @app.route("/webhook/logs")
@@ -1406,7 +1468,7 @@ def settings():
 
 
 # =========================================================
-# API: WHATSAPP STATUS
+# API - WHATSAPP STATUS
 # =========================================================
 
 @app.route(
@@ -1465,6 +1527,8 @@ def health():
 
     database_ok = False
 
+    database_error = None
+
     try:
 
         c = db()
@@ -1479,9 +1543,11 @@ def health():
 
     except Exception as e:
 
+        database_error = str(e)
+
         print(
             "DATABASE HEALTH ERROR:",
-            str(e)
+            database_error
         )
 
     return jsonify({
@@ -1502,17 +1568,18 @@ def health():
             whatsapp_configured(),
 
         "time":
-            datetime.utcnow().isoformat()
+            datetime.utcnow().isoformat(),
+
+        "database_error":
+            database_error
     })
 
 
 # =========================================================
-# RUN
+# RUN LOCAL
 # =========================================================
 
 if __name__ == "__main__":
-
-    init_db()
 
     port = int(
         os.getenv(
