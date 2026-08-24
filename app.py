@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from psycopg2 import IntegrityError
 import csv
 import io
 import os
@@ -10,38 +12,88 @@ import json
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "change-this-secret-key")
-
-DB = "deepaks_crm.db"
+app.secret_key = os.getenv(
+    "FLASK_SECRET_KEY",
+    "change-this-secret-key"
+)
 
 
 # =========================================================
-# DATABASE
+# DATABASE - POSTGRESQL
 # =========================================================
+
+class DBWrapper:
+
+    def __init__(self, connection):
+        self.connection = connection
+
+    def execute(self, query, params=None):
+
+        # Existing CRM queries use SQLite-style ? placeholders.
+        # PostgreSQL uses %s.
+        query = query.replace("?", "%s")
+
+        cursor = self.connection.cursor(
+            cursor_factory=RealDictCursor
+        )
+
+        if params is None:
+            cursor.execute(query)
+        else:
+            cursor.execute(query, params)
+
+        return cursor
+
+    def commit(self):
+        self.connection.commit()
+
+    def rollback(self):
+        self.connection.rollback()
+
+    def close(self):
+        self.connection.close()
+
 
 def db():
-    c = sqlite3.connect(DB)
-    c.row_factory = sqlite3.Row
-    return c
+
+    database_url = os.getenv("DATABASE_URL")
+
+    if not database_url:
+        raise RuntimeError(
+            "DATABASE_URL is not configured in Render Environment."
+        )
+
+    connection = psycopg2.connect(
+        database_url
+    )
+
+    return DBWrapper(connection)
 
 
 def init_db():
+
     c = db()
 
-    # Contacts
+    # =====================================================
+    # CONTACTS
+    # =====================================================
+
     c.execute("""
         CREATE TABLE IF NOT EXISTS contacts(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             phone TEXT NOT NULL UNIQUE,
             group_name TEXT DEFAULT 'General'
         )
     """)
 
-    # Campaigns
+    # =====================================================
+    # CAMPAIGNS
+    # =====================================================
+
     c.execute("""
         CREATE TABLE IF NOT EXISTS campaigns(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             message TEXT NOT NULL,
             group_name TEXT,
@@ -50,10 +102,13 @@ def init_db():
         )
     """)
 
-    # WhatsApp messages
+    # =====================================================
+    # WHATSAPP MESSAGES
+    # =====================================================
+
     c.execute("""
         CREATE TABLE IF NOT EXISTS whatsapp_messages(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             campaign_id INTEGER,
             contact_id INTEGER,
             phone TEXT,
@@ -67,10 +122,13 @@ def init_db():
         )
     """)
 
-    # Incoming messages
+    # =====================================================
+    # INCOMING WHATSAPP MESSAGES
+    # =====================================================
+
     c.execute("""
         CREATE TABLE IF NOT EXISTS whatsapp_incoming(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             wa_message_id TEXT UNIQUE,
             phone TEXT,
             message_type TEXT,
@@ -79,10 +137,13 @@ def init_db():
         )
     """)
 
-    # Webhook event log
+    # =====================================================
+    # WEBHOOK EVENTS
+    # =====================================================
+
     c.execute("""
         CREATE TABLE IF NOT EXISTS webhook_events(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             event_type TEXT,
             payload TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -93,29 +154,38 @@ def init_db():
     c.close()
 
 
-init_db()
-
-
 # =========================================================
 # ENVIRONMENT VARIABLES
 # =========================================================
 
 def get_env(name):
+
     return os.getenv(name, "").strip()
 
 
-WHATSAPP_ACCESS_TOKEN = get_env("WHATSAPP_ACCESS_TOKEN")
-WHATSAPP_PHONE_NUMBER_ID = get_env("WHATSAPP_PHONE_NUMBER_ID")
-META_APP_SECRET = get_env("META_APP_SECRET")
+WHATSAPP_ACCESS_TOKEN = get_env(
+    "WHATSAPP_ACCESS_TOKEN"
+)
+
+WHATSAPP_PHONE_NUMBER_ID = get_env(
+    "WHATSAPP_PHONE_NUMBER_ID"
+)
+
+META_APP_SECRET = get_env(
+    "META_APP_SECRET"
+)
+
 WEBHOOK_VERIFY_TOKEN = get_env(
     "WEBHOOK_VERIFY_TOKEN"
 ) or "margdarshak_webhook_2026"
 
 
 def whatsapp_configured():
+
     return bool(
         get_env("WHATSAPP_ACCESS_TOKEN")
-        and get_env("WHATSAPP_PHONE_NUMBER_ID")
+        and
+        get_env("WHATSAPP_PHONE_NUMBER_ID")
     )
 
 
@@ -124,27 +194,18 @@ def whatsapp_configured():
 # =========================================================
 
 def clean_phone(phone):
-    """
-    Meta WhatsApp API के लिए number:
-    country code सहित होना चाहिए.
-
-    Example:
-    919977483335
-    """
 
     if not phone:
         return ""
 
     phone = str(phone).strip()
 
-    # +, spaces, -, brackets हटाएँ
     phone = phone.replace("+", "")
     phone = phone.replace(" ", "")
     phone = phone.replace("-", "")
     phone = phone.replace("(", "")
     phone = phone.replace(")", "")
 
-    # शुरुआत में 00 हो तो हटाएँ
     if phone.startswith("00"):
         phone = phone[2:]
 
@@ -156,16 +217,14 @@ def clean_phone(phone):
 # =========================================================
 
 def verify_meta_signature():
-    """
-    Meta webhook POST request की signature verify करता है.
-    """
 
     if not META_APP_SECRET:
-        # Development में secret नहीं है तो allow करें.
-        # Production में META_APP_SECRET जरूर रखें.
         return True
 
-    signature = request.headers.get("X-Hub-Signature-256", "")
+    signature = request.headers.get(
+        "X-Hub-Signature-256",
+        ""
+    )
 
     if not signature.startswith("sha256="):
         return False
@@ -176,9 +235,16 @@ def verify_meta_signature():
         hashlib.sha256
     ).hexdigest()
 
-    received = signature.replace("sha256=", "", 1)
+    received = signature.replace(
+        "sha256=",
+        "",
+        1
+    )
 
-    return hmac.compare_digest(expected, received)
+    return hmac.compare_digest(
+        expected,
+        received
+    )
 
 
 # =========================================================
@@ -187,18 +253,36 @@ def verify_meta_signature():
 
 def send_whatsapp_text(phone, body):
 
-    token = get_env("WHATSAPP_ACCESS_TOKEN")
-    phone_id = get_env("WHATSAPP_PHONE_NUMBER_ID")
+    token = get_env(
+        "WHATSAPP_ACCESS_TOKEN"
+    )
+
+    phone_id = get_env(
+        "WHATSAPP_PHONE_NUMBER_ID"
+    )
 
     if not token or not phone_id:
-        return False, None, "WhatsApp API credentials missing"
+
+        return (
+            False,
+            None,
+            "WhatsApp API credentials missing"
+        )
 
     phone = clean_phone(phone)
 
     if not phone:
-        return False, None, "Invalid phone number"
 
-    url = f"https://graph.facebook.com/v23.0/{phone_id}/messages"
+        return (
+            False,
+            None,
+            "Invalid phone number"
+        )
+
+    url = (
+        f"https://graph.facebook.com/v23.0/"
+        f"{phone_id}/messages"
+    )
 
     headers = {
         "Authorization": f"Bearer {token}",
@@ -206,9 +290,13 @@ def send_whatsapp_text(phone, body):
     }
 
     payload = {
+
         "messaging_product": "whatsapp",
+
         "to": phone,
+
         "type": "text",
+
         "text": {
             "preview_url": False,
             "body": body
@@ -216,6 +304,7 @@ def send_whatsapp_text(phone, body):
     }
 
     try:
+
         r = requests.post(
             url,
             headers=headers,
@@ -229,20 +318,41 @@ def send_whatsapp_text(phone, body):
             data = r.text
 
         if r.ok:
+
             message_id = None
 
             if isinstance(data, dict):
-                messages = data.get("messages", [])
+
+                messages = data.get(
+                    "messages",
+                    []
+                )
 
                 if messages:
-                    message_id = messages[0].get("id")
 
-            return True, message_id, data
+                    message_id = messages[0].get(
+                        "id"
+                    )
 
-        return False, None, data
+            return (
+                True,
+                message_id,
+                data
+            )
+
+        return (
+            False,
+            None,
+            data
+        )
 
     except Exception as e:
-        return False, None, str(e)
+
+        return (
+            False,
+            None,
+            str(e)
+        )
 
 
 # =========================================================
@@ -256,18 +366,36 @@ def send_whatsapp_template(
     parameters=None
 ):
 
-    token = get_env("WHATSAPP_ACCESS_TOKEN")
-    phone_id = get_env("WHATSAPP_PHONE_NUMBER_ID")
+    token = get_env(
+        "WHATSAPP_ACCESS_TOKEN"
+    )
+
+    phone_id = get_env(
+        "WHATSAPP_PHONE_NUMBER_ID"
+    )
 
     if not token or not phone_id:
-        return False, None, "WhatsApp API credentials missing"
+
+        return (
+            False,
+            None,
+            "WhatsApp API credentials missing"
+        )
 
     phone = clean_phone(phone)
 
     if not phone:
-        return False, None, "Invalid phone number"
 
-    url = f"https://graph.facebook.com/v23.0/{phone_id}/messages"
+        return (
+            False,
+            None,
+            "Invalid phone number"
+        )
+
+    url = (
+        f"https://graph.facebook.com/v23.0/"
+        f"{phone_id}/messages"
+    )
 
     headers = {
         "Authorization": f"Bearer {token}",
@@ -277,23 +405,35 @@ def send_whatsapp_template(
     components = []
 
     if parameters:
+
         components.append({
+
             "type": "body",
+
             "parameters": [
+
                 {
                     "type": "text",
                     "text": str(value)
                 }
+
                 for value in parameters
+
             ]
         })
 
     payload = {
+
         "messaging_product": "whatsapp",
+
         "to": phone,
+
         "type": "template",
+
         "template": {
+
             "name": template_name,
+
             "language": {
                 "code": language_code
             }
@@ -301,9 +441,13 @@ def send_whatsapp_template(
     }
 
     if components:
-        payload["template"]["components"] = components
+
+        payload["template"][
+            "components"
+        ] = components
 
     try:
+
         r = requests.post(
             url,
             headers=headers,
@@ -317,20 +461,41 @@ def send_whatsapp_template(
             data = r.text
 
         if r.ok:
+
             message_id = None
 
             if isinstance(data, dict):
-                messages = data.get("messages", [])
+
+                messages = data.get(
+                    "messages",
+                    []
+                )
 
                 if messages:
-                    message_id = messages[0].get("id")
 
-            return True, message_id, data
+                    message_id = messages[0].get(
+                        "id"
+                    )
 
-        return False, None, data
+            return (
+                True,
+                message_id,
+                data
+            )
+
+        return (
+            False,
+            None,
+            data
+        )
 
     except Exception as e:
-        return False, None, str(e)
+
+        return (
+            False,
+            None,
+            str(e)
+        )
 
 
 # =========================================================
@@ -353,7 +518,8 @@ def dashboard():
     sent = c.execute("""
         SELECT COUNT(*) n
         FROM whatsapp_messages
-        WHERE status IN ('sent','delivered','read')
+        WHERE status IN
+        ('sent','delivered','read','accepted')
     """).fetchone()["n"]
 
     delivered = c.execute("""
@@ -399,7 +565,10 @@ def dashboard():
 # CONTACTS
 # =========================================================
 
-@app.route("/contacts", methods=["GET", "POST"])
+@app.route(
+    "/contacts",
+    methods=["GET", "POST"]
+)
 def contacts():
 
     if request.method == "POST":
@@ -407,8 +576,14 @@ def contacts():
         f = request.files.get("file")
 
         if not f:
-            flash("CSV file select करें.")
-            return redirect(url_for("contacts"))
+
+            flash(
+                "CSV file select करें."
+            )
+
+            return redirect(
+                url_for("contacts")
+            )
 
         text = f.read().decode(
             "utf-8-sig",
@@ -420,6 +595,7 @@ def contacts():
         )
 
         c = db()
+
         added = 0
 
         for row in reader:
@@ -456,7 +632,11 @@ def contacts():
 
                     c.execute("""
                         INSERT INTO contacts
-                        (name, phone, group_name)
+                        (
+                            name,
+                            phone,
+                            group_name
+                        )
                         VALUES (?, ?, ?)
                     """, (
                         name,
@@ -466,7 +646,8 @@ def contacts():
 
                     added += 1
 
-                except sqlite3.IntegrityError:
+                except IntegrityError:
+
                     pass
 
         c.commit()
@@ -500,21 +681,27 @@ def contacts():
 # CAMPAIGNS
 # =========================================================
 
-@app.route("/campaigns", methods=["GET", "POST"])
+@app.route(
+    "/campaigns",
+    methods=["GET", "POST"]
+)
 def campaigns():
 
     if request.method == "POST":
 
         name = request.form.get(
-            "name", ""
+            "name",
+            ""
         ).strip()
 
         message = request.form.get(
-            "message", ""
+            "message",
+            ""
         ).strip()
 
         group_name = request.form.get(
-            "group_name", ""
+            "group_name",
+            ""
         ).strip()
 
         if not name or not message:
@@ -531,7 +718,11 @@ def campaigns():
 
         c.execute("""
             INSERT INTO campaigns
-            (name, message, group_name)
+            (
+                name,
+                message,
+                group_name
+            )
             VALUES (?, ?, ?)
         """, (
             name,
@@ -559,12 +750,15 @@ def campaigns():
     """).fetchall()
 
     groups = [
+
         r["group_name"]
+
         for r in c.execute("""
             SELECT DISTINCT group_name
             FROM contacts
             ORDER BY group_name
         """).fetchall()
+
     ]
 
     c.close()
@@ -592,7 +786,9 @@ def send_campaign(cid):
         SELECT *
         FROM campaigns
         WHERE id=?
-    """, (cid,)).fetchone()
+    """, (
+        cid,
+    )).fetchone()
 
     if not campaign:
 
@@ -612,7 +808,9 @@ def send_campaign(cid):
             UPDATE campaigns
             SET status='API Not Configured'
             WHERE id=?
-        """, (cid,))
+        """, (
+            cid,
+        ))
 
         c.commit()
         c.close()
@@ -626,13 +824,14 @@ def send_campaign(cid):
             url_for("campaigns")
         )
 
-    # Contacts select करें
     q = "SELECT * FROM contacts"
+
     params = ()
 
     if campaign["group_name"]:
 
         q += " WHERE group_name=?"
+
         params = (
             campaign["group_name"],
         )
@@ -647,7 +846,9 @@ def send_campaign(cid):
 
     for contact in contacts:
 
-        body = campaign["message"].replace(
+        body = campaign[
+            "message"
+        ].replace(
             "{{name}}",
             contact["name"]
         )
@@ -656,9 +857,11 @@ def send_campaign(cid):
             contact["phone"]
         )
 
-        ok, message_id, response = send_whatsapp_text(
-            phone,
-            body
+        ok, message_id, response = (
+            send_whatsapp_text(
+                phone,
+                body
+            )
         )
 
         if ok:
@@ -675,7 +878,9 @@ def send_campaign(cid):
 
             failed += 1
 
-            error_text = str(response)
+            error_text = str(
+                response
+            )
 
         c.execute("""
             INSERT INTO whatsapp_messages
@@ -715,7 +920,8 @@ def send_campaign(cid):
 
     flash(
         f"Campaign finished: "
-        f"{sent} accepted, {failed} failed."
+        f"{sent} accepted, "
+        f"{failed} failed."
     )
 
     return redirect(
@@ -727,7 +933,10 @@ def send_campaign(cid):
 # WEBHOOK VERIFY - META GET REQUEST
 # =========================================================
 
-@app.route("/webhook", methods=["GET"])
+@app.route(
+    "/webhook",
+    methods=["GET"]
+)
 def webhook_verify():
 
     mode = request.args.get(
@@ -744,8 +953,10 @@ def webhook_verify():
 
     if (
         mode == "subscribe"
-        and token == WEBHOOK_VERIFY_TOKEN
+        and
+        token == WEBHOOK_VERIFY_TOKEN
     ):
+
         return challenge, 200
 
     return "Forbidden", 403
@@ -755,13 +966,20 @@ def webhook_verify():
 # WEBHOOK RECEIVE - META POST REQUEST
 # =========================================================
 
-@app.route("/webhook", methods=["POST"])
+@app.route(
+    "/webhook",
+    methods=["POST"]
+)
 def webhook_receive():
 
-    # Signature check
     if not verify_meta_signature():
 
-        return "Invalid signature", 403
+        return (
+            "Invalid signature",
+            403
+        )
+
+    c = None
 
     try:
 
@@ -770,14 +988,19 @@ def webhook_receive():
         )
 
         if not data:
+
             return "OK", 200
 
-        # पूरा event save करें
         c = db()
+
+        # Save complete webhook event
 
         c.execute("""
             INSERT INTO webhook_events
-            (event_type, payload)
+            (
+                event_type,
+                payload
+            )
             VALUES (?, ?)
         """, (
             "whatsapp",
@@ -786,12 +1009,6 @@ def webhook_receive():
                 ensure_ascii=False
             )
         ))
-
-        c.commit()
-
-        # -------------------------------------------------
-        # Meta WhatsApp structure
-        # -------------------------------------------------
 
         entries = data.get(
             "entry",
@@ -831,10 +1048,6 @@ def webhook_receive():
                         "status"
                     )
 
-                    recipient = status.get(
-                        "recipient_id"
-                    )
-
                     errors = status.get(
                         "errors"
                     )
@@ -842,6 +1055,7 @@ def webhook_receive():
                     error_text = None
 
                     if errors:
+
                         error_text = json.dumps(
                             errors,
                             ensure_ascii=False
@@ -861,10 +1075,6 @@ def webhook_receive():
                             error_text,
                             wa_id
                         ))
-
-                    # अगर message database में नहीं मिला
-                    else:
-                        pass
 
                 # =========================================
                 # INCOMING MESSAGE
@@ -922,9 +1132,13 @@ def webhook_receive():
                             {}
                         )
 
-                        if interactive.get(
-                            "type"
-                        ) == "button_reply":
+                        if (
+                            interactive.get(
+                                "type"
+                            )
+                            ==
+                            "button_reply"
+                        ):
 
                             message_text = (
                                 interactive
@@ -938,9 +1152,13 @@ def webhook_receive():
                                 )
                             )
 
-                        elif interactive.get(
-                            "type"
-                        ) == "list_reply":
+                        elif (
+                            interactive.get(
+                                "type"
+                            )
+                            ==
+                            "list_reply"
+                        ):
 
                             message_text = (
                                 interactive
@@ -953,6 +1171,8 @@ def webhook_receive():
                                     ""
                                 )
                             )
+
+                    # Save incoming message
 
                     if wa_message_id:
 
@@ -974,7 +1194,8 @@ def webhook_receive():
                                 message_text
                             ))
 
-                        except sqlite3.IntegrityError:
+                        except IntegrityError:
+
                             pass
 
                     # =====================================
@@ -983,17 +1204,23 @@ def webhook_receive():
 
                     if sender:
 
+                        cleaned_sender = clean_phone(
+                            sender
+                        )
+
                         existing = c.execute("""
                             SELECT id
                             FROM contacts
                             WHERE phone=?
                         """, (
-                            clean_phone(sender),
+                            cleaned_sender,
                         )).fetchone()
 
                         if not existing:
 
-                            profile_name = "WhatsApp Customer"
+                            profile_name = (
+                                "WhatsApp Customer"
+                            )
 
                             contacts_data = (
                                 value.get(
@@ -1004,9 +1231,12 @@ def webhook_receive():
 
                             if contacts_data:
 
-                                profile = contacts_data[0].get(
-                                    "profile",
-                                    {}
+                                profile = (
+                                    contacts_data[0]
+                                    .get(
+                                        "profile",
+                                        {}
+                                    )
                                 )
 
                                 profile_name = (
@@ -1029,17 +1259,20 @@ def webhook_receive():
                                     VALUES (?, ?, ?)
                                 """, (
                                     profile_name,
-                                    clean_phone(sender),
+                                    cleaned_sender,
                                     "WhatsApp"
                                 ))
 
-                            except sqlite3.IntegrityError:
+                            except IntegrityError:
+
                                 pass
 
         c.commit()
-        c.close()
 
-        return "EVENT_RECEIVED", 200
+        return (
+            "EVENT_RECEIVED",
+            200
+        )
 
     except Exception as e:
 
@@ -1048,7 +1281,26 @@ def webhook_receive():
             str(e)
         )
 
-        return "EVENT_RECEIVED", 200
+        if c:
+
+            try:
+                c.rollback()
+            except Exception:
+                pass
+
+        return (
+            "EVENT_RECEIVED",
+            200
+        )
+
+    finally:
+
+        if c:
+
+            try:
+                c.close()
+            except Exception:
+                pass
 
 
 # =========================================================
@@ -1136,12 +1388,19 @@ def settings():
 
     return render_template(
         "settings.html",
+
         config_ok=whatsapp_configured(),
+
         webhook_token_ok=bool(
-            get_env("WEBHOOK_VERIFY_TOKEN")
+            get_env(
+                "WEBHOOK_VERIFY_TOKEN"
+            )
         ),
+
         app_secret_ok=bool(
-            get_env("META_APP_SECRET")
+            get_env(
+                "META_APP_SECRET"
+            )
         )
     )
 
@@ -1150,23 +1409,50 @@ def settings():
 # API: WHATSAPP STATUS
 # =========================================================
 
-@app.route("/api/whatsapp/status")
+@app.route(
+    "/api/whatsapp/status"
+)
 def whatsapp_status():
 
     return jsonify({
-        "configured": whatsapp_configured(),
-        "phone_number_id": bool(
-            get_env("WHATSAPP_PHONE_NUMBER_ID")
-        ),
-        "access_token": bool(
-            get_env("WHATSAPP_ACCESS_TOKEN")
-        ),
-        "app_secret": bool(
-            get_env("META_APP_SECRET")
-        ),
-        "webhook_verify_token": bool(
-            get_env("WEBHOOK_VERIFY_TOKEN")
-        )
+
+        "configured":
+            whatsapp_configured(),
+
+        "phone_number_id":
+            bool(
+                get_env(
+                    "WHATSAPP_PHONE_NUMBER_ID"
+                )
+            ),
+
+        "access_token":
+            bool(
+                get_env(
+                    "WHATSAPP_ACCESS_TOKEN"
+                )
+            ),
+
+        "app_secret":
+            bool(
+                get_env(
+                    "META_APP_SECRET"
+                )
+            ),
+
+        "webhook_verify_token":
+            bool(
+                get_env(
+                    "WEBHOOK_VERIFY_TOKEN"
+                )
+            ),
+
+        "database_configured":
+            bool(
+                get_env(
+                    "DATABASE_URL"
+                )
+            )
     })
 
 
@@ -1177,10 +1463,46 @@ def whatsapp_status():
 @app.route("/health")
 def health():
 
+    database_ok = False
+
+    try:
+
+        c = db()
+
+        c.execute(
+            "SELECT 1"
+        ).fetchone()
+
+        c.close()
+
+        database_ok = True
+
+    except Exception as e:
+
+        print(
+            "DATABASE HEALTH ERROR:",
+            str(e)
+        )
+
     return jsonify({
+
         "status": "ok",
-        "whatsapp_configured": whatsapp_configured(),
-        "time": datetime.utcnow().isoformat()
+
+        "database_configured":
+            bool(
+                get_env(
+                    "DATABASE_URL"
+                )
+            ),
+
+        "database_connected":
+            database_ok,
+
+        "whatsapp_configured":
+            whatsapp_configured(),
+
+        "time":
+            datetime.utcnow().isoformat()
     })
 
 
