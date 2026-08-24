@@ -17,7 +17,6 @@ from datetime import datetime
 # =========================================================
 
 app = Flask(__name__)
-
 app.secret_key = os.getenv(
     "FLASK_SECRET_KEY",
     "change-this-secret-key"
@@ -33,7 +32,7 @@ def get_env(name):
 
 
 # =========================================================
-# DATABASE - POSTGRESQL
+# DATABASE
 # =========================================================
 
 class DBWrapper:
@@ -43,8 +42,7 @@ class DBWrapper:
 
     def execute(self, query, params=None):
 
-        # Convert old SQLite-style ? placeholders
-        # to PostgreSQL %s placeholders.
+        # PostgreSQL uses %s instead of ?
         query = query.replace("?", "%s")
 
         cursor = self.connection.cursor(
@@ -73,7 +71,6 @@ def db():
     database_url = get_env("DATABASE_URL")
 
     if not database_url:
-
         raise RuntimeError(
             "DATABASE_URL is not configured in Render Environment."
         )
@@ -98,9 +95,9 @@ def init_db():
 
         c = db()
 
-        # =====================================================
+        # -------------------------------------------------
         # CONTACTS
-        # =====================================================
+        # -------------------------------------------------
 
         c.execute("""
             CREATE TABLE IF NOT EXISTS contacts(
@@ -111,9 +108,9 @@ def init_db():
             )
         """)
 
-        # =====================================================
+        # -------------------------------------------------
         # CAMPAIGNS
-        # =====================================================
+        # -------------------------------------------------
 
         c.execute("""
             CREATE TABLE IF NOT EXISTS campaigns(
@@ -126,9 +123,9 @@ def init_db():
             )
         """)
 
-        # =====================================================
+        # -------------------------------------------------
         # WHATSAPP MESSAGES
-        # =====================================================
+        # -------------------------------------------------
 
         c.execute("""
             CREATE TABLE IF NOT EXISTS whatsapp_messages(
@@ -146,9 +143,9 @@ def init_db():
             )
         """)
 
-        # =====================================================
-        # INCOMING WHATSAPP MESSAGES
-        # =====================================================
+        # -------------------------------------------------
+        # INCOMING MESSAGES
+        # -------------------------------------------------
 
         c.execute("""
             CREATE TABLE IF NOT EXISTS whatsapp_incoming(
@@ -161,9 +158,9 @@ def init_db():
             )
         """)
 
-        # =====================================================
+        # -------------------------------------------------
         # WEBHOOK EVENTS
-        # =====================================================
+        # -------------------------------------------------
 
         c.execute("""
             CREATE TABLE IF NOT EXISTS webhook_events(
@@ -188,7 +185,6 @@ def init_db():
         )
 
         if c:
-
             try:
                 c.rollback()
             except Exception:
@@ -199,33 +195,18 @@ def init_db():
     finally:
 
         if c:
-
             try:
                 c.close()
             except Exception:
                 pass
 
 
-# =========================================================
-# IMPORTANT FOR RENDER / GUNICORN
-# =========================================================
-#
-# Render normally starts Flask with:
-#
-# gunicorn app:app
-#
-# Therefore __main__ block does not execute.
-#
-# So database initialization must happen during
-# application import/startup.
-#
-# =========================================================
-
+# Initialize database on startup
 init_db()
 
 
 # =========================================================
-# WHATSAPP ENVIRONMENT VARIABLES
+# WHATSAPP CONFIGURATION
 # =========================================================
 
 WHATSAPP_ACCESS_TOKEN = get_env(
@@ -256,7 +237,7 @@ def whatsapp_configured():
 
 
 # =========================================================
-# PHONE NUMBER CLEANING
+# PHONE CLEANING
 # =========================================================
 
 def clean_phone(phone):
@@ -279,7 +260,7 @@ def clean_phone(phone):
 
 
 # =========================================================
-# META SIGNATURE VERIFICATION
+# META SIGNATURE
 # =========================================================
 
 def verify_meta_signature():
@@ -314,7 +295,30 @@ def verify_meta_signature():
 
 
 # =========================================================
-# WHATSAPP TEXT MESSAGE
+# WHATSAPP API URL
+# =========================================================
+
+def whatsapp_messages_url():
+
+    phone_id = get_env(
+        "WHATSAPP_PHONE_NUMBER_ID"
+    )
+
+    if not phone_id:
+        return None
+
+    # IMPORTANT:
+    # This must be a normal URL.
+    # Do NOT put Markdown brackets here.
+
+    return (
+        f"https://graph.facebook.com/v23.0/"
+        f"{phone_id}/messages"
+    )
+
+
+# =========================================================
+# SEND WHATSAPP TEXT
 # =========================================================
 
 def send_whatsapp_text(phone, body):
@@ -345,10 +349,7 @@ def send_whatsapp_text(phone, body):
             "Invalid phone number"
         )
 
-    url = (
-        f"https://graph.facebook.com/v23.0/"
-        f"{phone_id}/messages"
-    )
+    url = whatsapp_messages_url()
 
     headers = {
         "Authorization": f"Bearer {token}",
@@ -422,7 +423,7 @@ def send_whatsapp_text(phone, body):
 
 
 # =========================================================
-# WHATSAPP TEMPLATE MESSAGE
+# SEND WHATSAPP TEMPLATE
 # =========================================================
 
 def send_whatsapp_template(
@@ -458,10 +459,7 @@ def send_whatsapp_template(
             "Invalid phone number"
         )
 
-    url = (
-        f"https://graph.facebook.com/v23.0/"
-        f"{phone_id}/messages"
-    )
+    url = whatsapp_messages_url()
 
     headers = {
         "Authorization": f"Bearer {token}",
@@ -484,7 +482,6 @@ def send_whatsapp_template(
                 }
 
                 for value in parameters
-
             ]
         })
 
@@ -572,34 +569,34 @@ def dashboard():
     c = db()
 
     contacts = c.execute(
-        "SELECT COUNT(*) n FROM contacts"
+        "SELECT COUNT(*) AS n FROM contacts"
     ).fetchone()["n"]
 
     campaigns = c.execute(
-        "SELECT COUNT(*) n FROM campaigns"
+        "SELECT COUNT(*) AS n FROM campaigns"
     ).fetchone()["n"]
 
     sent = c.execute("""
-        SELECT COUNT(*) n
+        SELECT COUNT(*) AS n
         FROM whatsapp_messages
         WHERE status IN
         ('sent','delivered','read','accepted')
     """).fetchone()["n"]
 
     delivered = c.execute("""
-        SELECT COUNT(*) n
+        SELECT COUNT(*) AS n
         FROM whatsapp_messages
         WHERE status='delivered'
     """).fetchone()["n"]
 
     read = c.execute("""
-        SELECT COUNT(*) n
+        SELECT COUNT(*) AS n
         FROM whatsapp_messages
         WHERE status='read'
     """).fetchone()["n"]
 
     failed = c.execute("""
-        SELECT COUNT(*) n
+        SELECT COUNT(*) AS n
         FROM whatsapp_messages
         WHERE status='failed'
     """).fetchone()["n"]
@@ -715,6 +712,7 @@ def contacts():
                     c.rollback()
 
         c.commit()
+
         c.close()
 
         flash(
@@ -795,6 +793,7 @@ def campaigns():
         ))
 
         c.commit()
+
         c.close()
 
         flash(
@@ -814,15 +813,14 @@ def campaigns():
     """).fetchall()
 
     groups = [
-
         r["group_name"]
 
         for r in c.execute("""
             SELECT DISTINCT group_name
             FROM contacts
+            WHERE group_name IS NOT NULL
             ORDER BY group_name
         """).fetchall()
-
     ]
 
     c.close()
@@ -846,151 +844,193 @@ def send_campaign(cid):
 
     c = db()
 
-    campaign = c.execute("""
-        SELECT *
-        FROM campaigns
-        WHERE id=?
-    """, (
-        cid,
-    )).fetchone()
+    try:
 
-    if not campaign:
-
-        c.close()
-
-        flash(
-            "Campaign not found."
-        )
-
-        return redirect(
-            url_for("campaigns")
-        )
-
-    if not whatsapp_configured():
-
-        c.execute("""
-            UPDATE campaigns
-            SET status='API Not Configured'
+        campaign = c.execute("""
+            SELECT *
+            FROM campaigns
             WHERE id=?
         """, (
             cid,
+        )).fetchone()
+
+        if not campaign:
+
+            flash(
+                "Campaign not found."
+            )
+
+            return redirect(
+                url_for("campaigns")
+            )
+
+        if not whatsapp_configured():
+
+            c.execute("""
+                UPDATE campaigns
+                SET status='API Not Configured'
+                WHERE id=?
+            """, (
+                cid,
+            ))
+
+            c.commit()
+
+            flash(
+                "WHATSAPP_ACCESS_TOKEN और "
+                "WHATSAPP_PHONE_NUMBER_ID configure करें."
+            )
+
+            return redirect(
+                url_for("campaigns")
+            )
+
+        # -------------------------------------------------
+        # CONTACT QUERY
+        # -------------------------------------------------
+
+        q = "SELECT * FROM contacts"
+
+        params = ()
+
+        if campaign["group_name"]:
+
+            q += " WHERE group_name=?"
+
+            params = (
+                campaign["group_name"],
+            )
+
+        contacts_list = c.execute(
+            q,
+            params
+        ).fetchall()
+
+        sent = 0
+        failed = 0
+
+        # -------------------------------------------------
+        # SEND TO EACH CONTACT
+        # -------------------------------------------------
+
+        for contact in contacts_list:
+
+            body = campaign["message"].replace(
+                "{{name}}",
+                contact["name"]
+            )
+
+            phone = clean_phone(
+                contact["phone"]
+            )
+
+            ok, message_id, response = (
+                send_whatsapp_text(
+                    phone,
+                    body
+                )
+            )
+
+            if ok:
+
+                status = "accepted"
+
+                sent += 1
+
+                error_text = None
+
+            else:
+
+                status = "failed"
+
+                failed += 1
+
+                if isinstance(
+                    response,
+                    (dict, list)
+                ):
+
+                    error_text = json.dumps(
+                        response,
+                        ensure_ascii=False
+                    )
+
+                else:
+
+                    error_text = str(
+                        response
+                    )
+
+            # Save message result
+            c.execute("""
+                INSERT INTO whatsapp_messages
+                (
+                    campaign_id,
+                    contact_id,
+                    phone,
+                    message,
+                    wa_message_id,
+                    direction,
+                    status,
+                    error
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                cid,
+                contact["id"],
+                phone,
+                body,
+                message_id,
+                "outgoing",
+                status,
+                error_text
+            ))
+
+        # -------------------------------------------------
+        # UPDATE CAMPAIGN
+        # -------------------------------------------------
+
+        c.execute("""
+            UPDATE campaigns
+            SET status=?
+            WHERE id=?
+        """, (
+            f"Accepted {sent}, Failed {failed}",
+            cid
         ))
 
         c.commit()
-        c.close()
 
         flash(
-            "WHATSAPP_ACCESS_TOKEN और "
-            "WHATSAPP_PHONE_NUMBER_ID configure करें."
+            f"Campaign finished: "
+            f"{sent} accepted, "
+            f"{failed} failed."
         )
 
         return redirect(
             url_for("campaigns")
         )
 
-    q = "SELECT * FROM contacts"
+    except Exception as e:
 
-    params = ()
+        c.rollback()
 
-    if campaign["group_name"]:
-
-        q += " WHERE group_name=?"
-
-        params = (
-            campaign["group_name"],
+        print(
+            "CAMPAIGN SEND ERROR:",
+            str(e)
         )
 
-    contacts = c.execute(
-        q,
-        params
-    ).fetchall()
-
-    sent = 0
-    failed = 0
-
-    for contact in contacts:
-
-        body = campaign[
-            "message"
-        ].replace(
-            "{{name}}",
-            contact["name"]
+        flash(
+            f"Campaign error: {str(e)}"
         )
 
-        phone = clean_phone(
-            contact["phone"]
+        return redirect(
+            url_for("campaigns")
         )
 
-        ok, message_id, response = (
-            send_whatsapp_text(
-                phone,
-                body
-            )
-        )
+    finally:
 
-        if ok:
-
-            status = "accepted"
-
-            sent += 1
-
-            error_text = None
-
-        else:
-
-            status = "failed"
-
-            failed += 1
-
-            error_text = str(
-                response
-            )
-
-        c.execute("""
-            INSERT INTO whatsapp_messages
-            (
-                campaign_id,
-                contact_id,
-                phone,
-                message,
-                wa_message_id,
-                direction,
-                status,
-                error
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            cid,
-            contact["id"],
-            phone,
-            body,
-            message_id,
-            "outgoing",
-            status,
-            error_text
-        ))
-
-    c.execute("""
-        UPDATE campaigns
-        SET status=?
-        WHERE id=?
-    """, (
-        f"Accepted {sent}, Failed {failed}",
-        cid
-    ))
-
-    c.commit()
-    c.close()
-
-    flash(
-        f"Campaign finished: "
-        f"{sent} accepted, "
-        f"{failed} failed."
-    )
-
-    return redirect(
-        url_for("campaigns")
-    )
+        c.close()
 
 
 # =========================================================
@@ -1023,7 +1063,10 @@ def webhook_verify():
 
         return challenge, 200
 
-    return "Forbidden", 403
+    return (
+        "Forbidden",
+        403
+    )
 
 
 # =========================================================
@@ -1053,13 +1096,16 @@ def webhook_receive():
 
         if not data:
 
-            return "OK", 200
+            return (
+                "OK",
+                200
+            )
 
         c = db()
 
-        # =====================================================
+        # -------------------------------------------------
         # SAVE COMPLETE WEBHOOK EVENT
-        # =====================================================
+        # -------------------------------------------------
 
         c.execute("""
             INSERT INTO webhook_events
@@ -1095,9 +1141,9 @@ def webhook_receive():
                     {}
                 )
 
-                # =================================================
+                # =========================================
                 # MESSAGE STATUS
-                # =================================================
+                # =========================================
 
                 statuses = value.get(
                     "statuses",
@@ -1142,16 +1188,16 @@ def webhook_receive():
                             wa_id
                         ))
 
-                # =================================================
+                # =========================================
                 # INCOMING MESSAGE
-                # =================================================
+                # =========================================
 
-                messages = value.get(
+                messages_data = value.get(
                     "messages",
                     []
                 )
 
-                for msg in messages:
+                for msg in messages_data:
 
                     wa_message_id = msg.get(
                         "id"
@@ -1167,6 +1213,10 @@ def webhook_receive():
 
                     message_text = ""
 
+                    # -------------------------------
+                    # TEXT
+                    # -------------------------------
+
                     if msg_type == "text":
 
                         message_text = (
@@ -1178,6 +1228,10 @@ def webhook_receive():
                                 ""
                             )
                         )
+
+                    # -------------------------------
+                    # BUTTON
+                    # -------------------------------
 
                     elif msg_type == "button":
 
@@ -1191,6 +1245,10 @@ def webhook_receive():
                             )
                         )
 
+                    # -------------------------------
+                    # INTERACTIVE
+                    # -------------------------------
+
                     elif msg_type == "interactive":
 
                         interactive = msg.get(
@@ -1198,9 +1256,11 @@ def webhook_receive():
                             {}
                         )
 
-                        if interactive.get(
-                            "type"
-                        ) == "button_reply":
+                        if (
+                            interactive.get("type")
+                            ==
+                            "button_reply"
+                        ):
 
                             message_text = (
                                 interactive
@@ -1214,9 +1274,11 @@ def webhook_receive():
                                 )
                             )
 
-                        elif interactive.get(
-                            "type"
-                        ) == "list_reply":
+                        elif (
+                            interactive.get("type")
+                            ==
+                            "list_reply"
+                        ):
 
                             message_text = (
                                 interactive
@@ -1230,9 +1292,9 @@ def webhook_receive():
                                 )
                             )
 
-                    # =================================================
+                    # =========================================
                     # SAVE INCOMING MESSAGE
-                    # =================================================
+                    # =========================================
 
                     if wa_message_id:
 
@@ -1258,9 +1320,9 @@ def webhook_receive():
 
                             c.rollback()
 
-                    # =================================================
+                    # =========================================
                     # AUTO CREATE CONTACT
-                    # =================================================
+                    # =========================================
 
                     if sender:
 
@@ -1348,8 +1410,7 @@ def webhook_receive():
             except Exception:
                 pass
 
-        # WhatsApp webhook should receive 200
-        # so it does not repeatedly retry.
+        # Return 200 so Meta does not keep retrying
         return (
             "EVENT_RECEIVED",
             200
@@ -1366,17 +1427,27 @@ def webhook_receive():
 
 
 # =========================================================
-# MESSAGE HISTORY
+# MESSAGES TEST
 # =========================================================
 
-@app.route("/messages-test")
+@app.route(
+    "/messages-test"
+)
 def messages_test():
+
     return {
         "status": "ok",
         "message": "MESSAGES ROUTING WORKING"
     }
 
-@app.route("/messages")
+
+# =========================================================
+# MESSAGE HISTORY
+# =========================================================
+
+@app.route(
+    "/messages"
+)
 def messages():
 
     c = db()
@@ -1401,10 +1472,12 @@ def messages():
 
 
 # =========================================================
-# INCOMING MESSAGES
+# INCOMING
 # =========================================================
 
-@app.route("/incoming")
+@app.route(
+    "/incoming"
+)
 def incoming():
 
     c = db()
@@ -1425,17 +1498,27 @@ def incoming():
 
 
 # =========================================================
-# WEBHOOK LOGS
+# WEBHOOK TEST
 # =========================================================
 
-@app.route("/webhook-test")
+@app.route(
+    "/webhook-test"
+)
 def webhook_test():
+
     return {
         "status": "ok",
         "message": "WEBHOOK ROUTING WORKING"
     }
-    
-@app.route("/webhook/logs")
+
+
+# =========================================================
+# WEBHOOK LOGS
+# =========================================================
+
+@app.route(
+    "/webhook/logs"
+)
 def webhook_logs():
 
     c = db()
@@ -1459,7 +1542,9 @@ def webhook_logs():
 # SETTINGS
 # =========================================================
 
-@app.route("/settings")
+@app.route(
+    "/settings"
+)
 def settings():
 
     return render_template(
@@ -1482,7 +1567,7 @@ def settings():
 
 
 # =========================================================
-# API - WHATSAPP STATUS
+# WHATSAPP STATUS API
 # =========================================================
 
 @app.route(
@@ -1536,11 +1621,12 @@ def whatsapp_status():
 # HEALTH CHECK
 # =========================================================
 
-@app.route("/health")
+@app.route(
+    "/health"
+)
 def health():
 
     database_ok = False
-
     database_error = None
 
     try:
@@ -1590,19 +1676,42 @@ def health():
 
 
 # =========================================================
-# RUN LOCAL
+# DEBUG ROUTES
 # =========================================================
 
-@app.route("/debug/routes")
+@app.route(
+    "/debug/routes"
+)
 def debug_routes():
+
     return jsonify([
+
         {
             "rule": str(rule),
             "endpoint": rule.endpoint,
-            "methods": sorted(rule.methods)
+            "methods": sorted(
+                rule.methods
+            )
         }
+
         for rule in app.url_map.iter_rules()
     ])
+
+
+@app.route(
+    "/debug/test"
+)
+def debug_test():
+
+    return {
+        "status": "ok",
+        "message": "DEBUG TEST ROUTE WORKING"
+    }
+
+
+# =========================================================
+# RUN LOCAL
+# =========================================================
 
 if __name__ == "__main__":
 
@@ -1618,10 +1727,3 @@ if __name__ == "__main__":
         port=port,
         debug=False
     )
-
-@app.route("/debug/test")
-def debug_test():
-    return {
-        "status": "ok",
-        "message": "DEBUG TEST ROUTE WORKING"
-    }
