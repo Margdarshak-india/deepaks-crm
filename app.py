@@ -1579,6 +1579,17 @@ def health():
 # RUN LOCAL
 # =========================================================
 
+@app.route("/debug/routes")
+def debug_routes():
+    return jsonify([
+        {
+            "rule": str(rule),
+            "endpoint": rule.endpoint,
+            "methods": sorted(rule.methods)
+        }
+        for rule in app.url_map.iter_rules()
+    ])
+
 if __name__ == "__main__":
 
     port = int(
