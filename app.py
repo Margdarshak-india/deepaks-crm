@@ -831,7 +831,6 @@ def campaigns():
         groups=groups
     )
 
-
 # =========================================================
 # SEND CAMPAIGN
 # =========================================================
@@ -845,6 +844,10 @@ def send_campaign(cid):
     c = db()
 
     try:
+
+        # -------------------------------------------------
+        # GET CAMPAIGN
+        # -------------------------------------------------
 
         campaign = c.execute("""
             SELECT *
@@ -863,6 +866,10 @@ def send_campaign(cid):
             return redirect(
                 url_for("campaigns")
             )
+
+        # -------------------------------------------------
+        # CHECK WHATSAPP CONFIGURATION
+        # -------------------------------------------------
 
         if not whatsapp_configured():
 
@@ -886,7 +893,7 @@ def send_campaign(cid):
             )
 
         # -------------------------------------------------
-        # CONTACT QUERY
+        # GET CONTACTS
         # -------------------------------------------------
 
         q = "SELECT * FROM contacts"
@@ -910,7 +917,7 @@ def send_campaign(cid):
         failed = 0
 
         # -------------------------------------------------
-        # SEND TO EACH CONTACT
+        # SEND MESSAGE TO EACH CONTACT
         # -------------------------------------------------
 
         for contact in contacts_list:
@@ -924,12 +931,20 @@ def send_campaign(cid):
                 contact["phone"]
             )
 
+            # ---------------------------------------------
+            # SEND TO WHATSAPP
+            # ---------------------------------------------
+
             ok, message_id, response = (
                 send_whatsapp_text(
                     phone,
                     body
                 )
             )
+
+            # ---------------------------------------------
+            # DETERMINE STATUS
+            # ---------------------------------------------
 
             if ok:
 
@@ -961,33 +976,62 @@ def send_campaign(cid):
                         response
                     )
 
-            # Save message result
-            c.execute("""
-                INSERT INTO whatsapp_messages
-                (
-                    campaign_id,
-                    contact_id,
+            # ---------------------------------------------
+            # SAVE MESSAGE RESULT
+            # ---------------------------------------------
+
+            try:
+
+                c.execute("""
+                    INSERT INTO whatsapp_messages
+                    (
+                        campaign_id,
+                        contact_id,
+                        phone,
+                        message,
+                        wa_message_id,
+                        direction,
+                        status,
+                        error
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    cid,
+                    contact["id"],
                     phone,
-                    message,
-                    wa_message_id,
-                    direction,
+                    body,
+                    message_id,
+                    "outgoing",
                     status,
-                    error
+                    error_text
+                ))
+
+                # Commit each message separately.
+                # This prevents one failed database operation
+                # from removing previously saved messages.
+
+                c.commit()
+
+            except Exception as db_error:
+
+                print(
+                    "MESSAGE DATABASE ERROR:",
+                    str(db_error)
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                cid,
-                contact["id"],
-                phone,
-                body,
-                message_id,
-                "outgoing",
-                status,
-                error_text
-            ))
+
+                c.rollback()
+
+                # If WhatsApp accepted the message but the
+                # database could not save it, count it as
+                # failed for CRM reporting.
+
+                if ok:
+
+                    sent -= 1
+                    failed += 1
 
         # -------------------------------------------------
-        # UPDATE CAMPAIGN
+        # FINAL CAMPAIGN STATUS
         # -------------------------------------------------
 
         c.execute("""
@@ -1001,6 +1045,10 @@ def send_campaign(cid):
 
         c.commit()
 
+        # -------------------------------------------------
+        # RESULT MESSAGE
+        # -------------------------------------------------
+
         flash(
             f"Campaign finished: "
             f"{sent} accepted, "
@@ -1013,12 +1061,15 @@ def send_campaign(cid):
 
     except Exception as e:
 
-        c.rollback()
-
         print(
             "CAMPAIGN SEND ERROR:",
             str(e)
         )
+
+        try:
+            c.rollback()
+        except Exception:
+            pass
 
         flash(
             f"Campaign error: {str(e)}"
@@ -1030,8 +1081,10 @@ def send_campaign(cid):
 
     finally:
 
-        c.close()
-
+        try:
+            c.close()
+        except Exception:
+            pass
 
 # =========================================================
 # WEBHOOK VERIFY
