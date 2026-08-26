@@ -635,30 +635,204 @@ def dashboard():
         recent=recent
     )
 
-
 # =========================================================
 # CONTACTS
 # =========================================================
 
-@app.route("/contacts", methods=["GET", "POST"])
+@app.route(
+    "/contacts",
+    methods=["GET", "POST"]
+)
 def contacts():
+
     if request.method == "POST":
+
         f = request.files.get("file")
 
         if not f:
             flash("CSV file select करें.")
-            return redirect(url_for("contacts"))
+            return redirect(
+                url_for("contacts")
+            )
 
         text = f.read().decode(
             "utf-8-sig",
             errors="ignore"
         )
 
-        added, extra = import_csv_text(text)
+        reader = csv.DictReader(
+            io.StringIO(text)
+        )
 
-        flash(f"{added} contacts imported. {extra}")
+        c = db()
 
-        return redirect(url_for("contacts"))
+        added = 0
+        skipped = 0
+
+        try:
+
+            for row in reader:
+
+                # =================================================
+                # FIND NAME FROM MULTIPLE POSSIBLE COLUMN NAMES
+                # =================================================
+
+                name = ""
+
+                name_columns = [
+                    "Student Name",
+                    "student name",
+                    "STUDENT NAME",
+                    "Name",
+                    "name",
+                    "Full Name",
+                    "full name",
+                    "Student",
+                    "student",
+                    "Customer Name",
+                    "customer name"
+                ]
+
+                for column in name_columns:
+
+                    value = row.get(column)
+
+                    if value and str(value).strip():
+
+                        name = str(value).strip()
+                        break
+
+                # =================================================
+                # FIND PHONE FROM MULTIPLE POSSIBLE COLUMN NAMES
+                # =================================================
+
+                phone = ""
+
+                phone_columns = [
+                    "Mobile",
+                    "mobile",
+                    "MOBILE",
+                    "Mobile Number",
+                    "mobile number",
+                    "Phone",
+                    "phone",
+                    "Phone Number",
+                    "phone number",
+                    "WhatsApp",
+                    "whatsapp",
+                    "WhatsApp Number",
+                    "whatsapp number"
+                ]
+
+                for column in phone_columns:
+
+                    value = row.get(column)
+
+                    if value and str(value).strip():
+
+                        phone = str(value).strip()
+                        break
+
+                phone = clean_phone(phone)
+
+                # =================================================
+                # GROUP
+                # =================================================
+
+                group = ""
+
+                group_columns = [
+                    "Group",
+                    "group",
+                    "GROUP",
+                    "Group Name",
+                    "group name"
+                ]
+
+                for column in group_columns:
+
+                    value = row.get(column)
+
+                    if value and str(value).strip():
+
+                        group = str(value).strip()
+                        break
+
+                if not group:
+                    group = "General"
+
+                # =================================================
+                # SKIP ROW IF PHONE IS EMPTY
+                # =================================================
+
+                if not phone:
+
+                    skipped += 1
+                    continue
+
+                # =================================================
+                # IF NAME IS EMPTY
+                # DO NOT USE "Customer"
+                # =================================================
+
+                if not name:
+
+                    name = "Unknown"
+
+                # =================================================
+                # INSERT CONTACT
+                # =================================================
+
+                try:
+
+                    c.execute("""
+                        INSERT INTO contacts
+                        (
+                            name,
+                            phone,
+                            group_name
+                        )
+                        VALUES (?, ?, ?)
+                    """, (
+                        name,
+                        phone,
+                        group
+                    ))
+
+                    added += 1
+
+                except IntegrityError:
+
+                    # Duplicate phone number
+                    c.rollback()
+                    skipped += 1
+
+            c.commit()
+
+            flash(
+                f"{added} contacts imported successfully. "
+                f"{skipped} skipped."
+            )
+
+        except Exception as e:
+
+            c.rollback()
+
+            flash(
+                f"Import error: {str(e)}"
+            )
+
+        finally:
+
+            c.close()
+
+        return redirect(
+            url_for("contacts")
+        )
+
+    # =========================================================
+    # SHOW CONTACTS
+    # =========================================================
 
     c = db()
 
@@ -674,7 +848,6 @@ def contacts():
         "contacts.html",
         rows=rows
     )
-
 
 # =========================================================
 # GOOGLE DRIVE
