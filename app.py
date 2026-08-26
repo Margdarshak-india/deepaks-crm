@@ -1109,9 +1109,9 @@ if campaign_type == "single":
         flash("Please enter a valid WhatsApp number.")
         return redirect(url_for("campaigns"))
 
-    group_name = "__SINGLE__:" + single_number
+        group_name = "__SINGLE__:" + single_number
 
-    if not name or not message:
+        if not name or not message:
             flash(
                 "Campaign name and message are required."
             )
