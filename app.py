@@ -509,26 +509,26 @@ def import_csv_text(text):
     skipped = 0
 
     try:
-        for row in reader:
-            name = (
-    row.get("name")
-    or row.get("Name")
-    or row.get("student name")
-    or row.get("Student Name")
-    or row.get("student_name")
-    or row.get("Student_Name")
-    or ""
-).strip()
+        
+               for row in reader:
 
-name = name or "Customer"
+            name = (
+                row.get("name")
+                or row.get("Name")
+                or row.get("student name")
+                or row.get("Student Name")
+                or row.get("student_name")
+                or row.get("Student_Name")
+                or ""
+            ).strip()
+
+            name = name or "Customer"
 
             phone = (
                 row.get("phone")
                 or row.get("Phone")
                 or row.get("mobile")
                 or row.get("Mobile")
-                or row.get("phone_number")
-                or row.get("Phone Number")
                 or ""
             ).strip()
 
@@ -537,42 +537,34 @@ name = name or "Customer"
             group = (
                 row.get("group")
                 or row.get("Group")
-                or row.get("group_name")
-                or row.get("Group Name")
                 or "General"
             ).strip()
 
             group = group or "General"
 
-            if not phone:
-                skipped += 1
-                continue
+            if phone:
 
-            try:
-                c.execute("""
-                    INSERT INTO contacts
-                    (name, phone, group_name)
-                    VALUES (?, ?, ?)
-                    ON CONFLICT (phone) DO NOTHING
-                """, (name, phone, group))
+                try:
 
-                if c.connection.info.transaction_status:
-                    pass
+                    c.execute("""
+                        INSERT INTO contacts
+                        (
+                            name,
+                            phone,
+                            group_name
+                        )
+                        VALUES (?, ?, ?)
+                    """, (
+                        name,
+                        phone,
+                        group
+                    ))
 
-                added += 1
+                    added += 1
 
-            except Exception:
-                c.rollback()
-                skipped += 1
+                except IntegrityError:
 
-        c.commit()
-
-    except Exception:
-        c.rollback()
-        raise
-
-    finally:
-        c.close()
+                    c.rollback()
 
     return added, f"{skipped} rows skipped."
 
