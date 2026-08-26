@@ -1092,6 +1092,25 @@ def campaigns():
             ""
         ).strip()
 
+        campaign_type = request.form.get(
+    "campaign_type",
+    "group"
+).strip()
+
+single_number = request.form.get(
+    "single_number",
+    ""
+).strip()
+
+if campaign_type == "single":
+    single_number = clean_phone(single_number)
+
+    if not single_number:
+        flash("Please enter a valid WhatsApp number.")
+        return redirect(url_for("campaigns"))
+
+    group_name = "__SINGLE__:" + single_number
+
         if not name or not message:
             flash(
                 "Campaign name और message जरूरी है."
@@ -1255,31 +1274,77 @@ def send_campaign(cid):
             c.commit()
 
             flash(
-                "WHATSAPP_ACCESS_TOKEN और "
-                "WHATSAPP_PHONE_NUMBER_ID configure करें."
+                "Please configure WHATSAPP_ACCESS_TOKEN and "
+                "WHATSAPP_PHONE_NUMBER_ID."
             )
 
             return redirect(url_for("campaigns"))
 
-        q = "SELECT * FROM contacts"
-        params = ()
+        group_name = campaign["group_name"] or ""
 
-        if campaign["group_name"]:
-            q += " WHERE group_name=?"
-            params = (campaign["group_name"],)
+        # =====================================================
+        # SINGLE NUMBER CAMPAIGN
+        # =====================================================
 
-        contacts_list = c.execute(q, params).fetchall()
+        if group_name.startswith("__SINGLE__:"):
+
+            single_number = group_name.replace(
+                "__SINGLE__:",
+                "",
+                1
+            ).strip()
+
+            single_number = clean_phone(single_number)
+
+            if not single_number:
+                flash("Invalid WhatsApp number.")
+                return redirect(url_for("campaigns"))
+
+            contacts_list = [{
+                "id": None,
+                "name": "Customer",
+                "phone": single_number
+            }]
+
+        # =====================================================
+        # GROUP / ALL CONTACTS CAMPAIGN
+        # =====================================================
+
+        else:
+
+            q = "SELECT * FROM contacts"
+            params = ()
+
+            if group_name:
+                q += " WHERE group_name=?"
+                params = (group_name,)
+
+            contacts_list = c.execute(
+                q,
+                params
+            ).fetchall()
 
         sent = 0
         failed = 0
 
+        # =====================================================
+        # SEND MESSAGES
+        # =====================================================
+
         for contact in contacts_list:
+
             body = campaign["message"].replace(
                 "{{name}}",
-                contact["name"]
+                contact["name"] or "Customer"
             )
 
-            phone = clean_phone(contact["phone"])
+            phone = clean_phone(
+                contact["phone"]
+            )
+
+            if not phone:
+                failed += 1
+                continue
 
             ok, message_id, response = send_whatsapp_text(
                 phone,
@@ -1290,6 +1355,7 @@ def send_campaign(cid):
                 status = "accepted"
                 sent += 1
                 error_text = None
+
             else:
                 status = "failed"
                 failed += 1
@@ -1302,7 +1368,12 @@ def send_campaign(cid):
                 else:
                     error_text = str(response)
 
+            # =================================================
+            # SAVE WHATSAPP MESSAGE RECORD
+            # =================================================
+
             try:
+
                 c.execute("""
                     INSERT INTO whatsapp_messages
                     (
@@ -1330,6 +1401,7 @@ def send_campaign(cid):
                 c.commit()
 
             except Exception as db_error:
+
                 print(
                     "MESSAGE DATABASE ERROR:",
                     str(db_error)
@@ -1340,6 +1412,10 @@ def send_campaign(cid):
                 if ok:
                     sent -= 1
                     failed += 1
+
+        # =====================================================
+        # UPDATE CAMPAIGN STATUS
+        # =====================================================
 
         c.execute("""
             UPDATE campaigns
@@ -1357,26 +1433,36 @@ def send_campaign(cid):
             f"{failed} failed."
         )
 
-        return redirect(url_for("campaigns"))
+        return redirect(
+            url_for("campaigns")
+        )
 
     except Exception as e:
-        print("CAMPAIGN SEND ERROR:", str(e))
+
+        print(
+            "CAMPAIGN SEND ERROR:",
+            str(e)
+        )
 
         try:
             c.rollback()
         except Exception:
             pass
 
-        flash(f"Campaign error: {str(e)}")
+        flash(
+            f"Campaign error: {str(e)}"
+        )
 
-        return redirect(url_for("campaigns"))
+        return redirect(
+            url_for("campaigns")
+        )
 
     finally:
+
         try:
             c.close()
         except Exception:
             pass
-
 
 # =========================================================
 # WEBHOOK VERIFY
