@@ -1,1 +1,116 @@
-{% extends "base.html" %}{% block content %}<h1>WhatsApp Campaigns</h1><div class="panel"><form method="post" class="form"><label>Campaign Name</label><input name="name" required><label>Group</label><select name="group_name"><option value="">All contacts</option>{% for g in groups %}<option>{{g}}</option>{% endfor %}</select><label>Message</label><textarea name="message" placeholder="Hello {{name}}, ..." required></textarea><button class="btn">Save Campaign</button></form></div><br><div class="panel"><table class="table"><tr><th>Name</th><th>Group</th><th>Status</th><th></th></tr>{% for r in rows %}<tr><td>{{r.name}}</td><td>{{r.group_name or 'All'}}</td><td>{{r.status}}</td><td><form method="post" action="/campaign/{{r.id}}/send"><button class="btn">Send</button></form></td></tr>{% else %}<tr><td colspan="4">No campaigns.</td></tr>{% endfor %}</table></div>{% endblock %}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WhatsApp Campaigns</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f5f7fb;margin:0;color:#172033}
+nav{background:#123f69;color:#fff;padding:18px}
+nav a{color:#fff;text-decoration:none;margin-right:20px;font-size:17px}
+.container{max-width:900px;margin:35px auto;padding:0 18px}
+.card{background:#fff;border-radius:18px;padding:28px;margin-bottom:25px;box-shadow:0 5px 20px #00000012}
+h1{font-size:40px}
+label{display:block;margin:16px 0 8px;font-size:18px}
+input,select,textarea{width:100%;box-sizing:border-box;padding:14px;border:1px solid #ccd3dc;border-radius:10px;font-size:16px}
+textarea{min-height:180px}
+button,.btn{display:inline-block;background:#1976b8;color:#fff;border:0;border-radius:9px;padding:12px 18px;font-size:16px;text-decoration:none;cursor:pointer}
+.secondary{background:#586575}
+.success{background:#168a52}
+.attachment{background:#eef7ff;border:1px solid #9bc9ef;padding:15px;border-radius:10px;margin-top:12px}
+.small{color:#64748b;font-size:14px}
+table{width:100%;border-collapse:collapse}
+td,th{padding:12px;border-bottom:1px solid #e5e7eb;text-align:left}
+.flash{background:#fff3cd;padding:12px;border-radius:8px;margin-bottom:12px}
+</style>
+</head>
+<body>
+<nav>
+<a href="/">Dashboard</a>
+<a href="/contacts">Contacts</a>
+<a href="/campaigns">Campaigns</a>
+<a href="/messages">Messages</a>
+<a href="/incoming">Incoming</a>
+<a href="/settings">Settings</a>
+</nav>
+
+<div class="container">
+<h1>WhatsApp Campaigns</h1>
+
+{% with messages = get_flashed_messages() %}
+{% for message in messages %}
+<div class="flash">{{ message }}</div>
+{% endfor %}
+{% endwith %}
+
+<div class="card">
+<form method="post">
+<label>Campaign Name</label>
+<input name="name" required>
+
+<label>Group</label>
+<select name="group_name">
+<option value="">All contacts</option>
+{% for group in groups %}
+<option value="{{ group }}">{{ group }}</option>
+{% endfor %}
+</select>
+
+<label>Message</label>
+<textarea name="message" placeholder="Hello {{name}}, ..."></textarea>
+
+<label>Attachment from Google Drive</label>
+
+{% if drive_connected %}
+<a class="btn secondary" href="/google/drive">Choose from Google Drive</a>
+<p class="small">Google Drive connected. Choose a file and return here.</p>
+{% else %}
+<a class="btn secondary" href="/google/authorize">Connect Google Drive</a>
+<p class="small">First connect the Google Drive account you want to use.</p>
+{% endif %}
+
+{% if selected_drive_file.id %}
+<div class="attachment">
+<strong>Selected attachment:</strong><br>
+{{ selected_drive_file.name }}<br>
+<span class="small">{{ selected_drive_file.mimeType }}</span>
+<input type="hidden" name="drive_file_id" value="{{ selected_drive_file.id }}">
+<input type="hidden" name="drive_file_name" value="{{ selected_drive_file.name }}">
+<input type="hidden" name="drive_mime_type" value="{{ selected_drive_file.mimeType }}">
+</div>
+{% else %}
+<input type="hidden" name="drive_file_id" value="">
+<input type="hidden" name="drive_file_name" value="">
+<input type="hidden" name="drive_mime_type" value="">
+{% endif %}
+
+<br>
+<button type="submit">Save Campaign</button>
+</form>
+</div>
+
+<div class="card">
+<h2>Campaigns</h2>
+<table>
+<tr><th>Name</th><th>Group</th><th>Status</th><th>Action</th></tr>
+{% for row in rows %}
+<tr>
+<td>{{ row.name }}</td>
+<td>{{ row.group_name or 'All contacts' }}</td>
+<td>{{ row.status }}</td>
+<td>
+<form method="post" action="/campaign/{{ row.id }}/send"
+      onsubmit="return confirm('Send this campaign now?');">
+<button class="success" type="submit">Send</button>
+</form>
+{% if row.drive_file_name %}
+<div class="small">📎 {{ row.drive_file_name }}</div>
+{% endif %}
+</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+</div>
+</body>
+</html>
