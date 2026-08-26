@@ -511,14 +511,16 @@ def import_csv_text(text):
     try:
         for row in reader:
             name = (
-                row.get("name")
-                or row.get("Name")
-                or row.get("full_name")
-                or row.get("Full Name")
-                or ""
-            ).strip()
+    row.get("name")
+    or row.get("Name")
+    or row.get("student name")
+    or row.get("Student Name")
+    or row.get("student_name")
+    or row.get("Student_Name")
+    or ""
+).strip()
 
-            name = name or "Customer"
+name = name or "Customer"
 
             phone = (
                 row.get("phone")
