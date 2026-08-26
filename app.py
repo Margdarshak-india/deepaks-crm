@@ -1792,3 +1792,76 @@ if __name__ == "__main__":
         port=port,
         debug=False
     )
+
+# =========================================================
+# DELETE SELECTED CONTACTS
+# =========================================================
+
+@app.route("/contacts/delete-selected", methods=["POST"])
+def delete_selected_contacts():
+
+    ids = request.form.getlist("contact_ids")
+
+    if not ids:
+        flash("No contacts selected.")
+        return redirect(url_for("contacts"))
+
+    c = db()
+
+    try:
+
+        c.execute(
+            """
+            DELETE FROM contacts
+            WHERE id = ANY(%s)
+            """,
+            (ids,)
+        )
+
+        deleted = c.execute(
+            "SELECT 1"
+        ).rowcount
+
+        c.commit()
+
+        flash("Selected contacts deleted successfully.")
+
+    except Exception as e:
+
+        c.rollback()
+        flash(f"Delete error: {str(e)}")
+
+    finally:
+
+        c.close()
+
+    return redirect(url_for("contacts"))
+
+
+# =========================================================
+# DELETE ALL CONTACTS
+# =========================================================
+
+@app.route("/contacts/delete-all", methods=["POST"])
+def delete_all_contacts():
+
+    c = db()
+
+    try:
+
+        c.execute("DELETE FROM contacts")
+
+        c.commit()
+
+        flash("All contacts deleted successfully.")
+
+    except Exception as e:
+
+        c.rollback()
+        flash(f"Delete error: {str(e)}")
+
+    finally:
+
+        c.close()
+
+    return redirect(url_for("contacts"))
