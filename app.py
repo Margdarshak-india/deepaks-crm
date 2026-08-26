@@ -889,56 +889,119 @@ def delete_contact(contact_id):
 
 @app.route("/campaigns", methods=["GET", "POST"])
 def campaigns():
+
     if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        message = request.form.get("message", "").strip()
-        group_name = request.form.get("group_name", "").strip()
+
+        name = request.form.get(
+            "name",
+            ""
+        ).strip()
+
+        message = request.form.get(
+            "message",
+            ""
+        ).strip()
+
+        group_name = request.form.get(
+            "group_name",
+            ""
+        ).strip()
 
         if not name or not message:
-            flash("Campaign name और message जरूरी है.")
-            return redirect(url_for("campaigns"))
+            flash(
+                "Campaign name और message जरूरी है."
+            )
+            return redirect(
+                url_for("campaigns")
+            )
 
         c = db()
 
-        c.execute("""
-            INSERT INTO campaigns
-            (name, message, group_name)
-            VALUES (?, ?, ?)
-        """, (name, message, group_name))
+        try:
 
-        c.commit()
-        c.close()
+            c.execute("""
+                INSERT INTO campaigns
+                (
+                    name,
+                    message,
+                    group_name
+                )
+                VALUES (?, ?, ?)
+            """, (
+                name,
+                message,
+                group_name
+            ))
 
-        flash("Campaign saved as Draft.")
-        return redirect(url_for("campaigns"))
+            c.commit()
+
+            flash(
+                "Campaign saved as Draft."
+            )
+
+        except Exception as e:
+
+            c.rollback()
+
+            flash(
+                f"Campaign error: {str(e)}"
+            )
+
+        finally:
+
+            c.close()
+
+        return redirect(
+            url_for("campaigns")
+        )
+
+    # =====================================================
+    # GET CAMPAIGNS
+    # =====================================================
 
     c = db()
 
-    rows = c.execute("""
-        SELECT *
-        FROM campaigns
-        ORDER BY id DESC
-    """).fetchall()
+    try:
 
-    groups = [
-        r["group_name"]
-        for r in c.execute("""
-            SELECT DISTINCT group_name
-            FROM contacts
-            WHERE group_name IS NOT NULL
-            ORDER BY group_name
+        rows = c.execute("""
+            SELECT *
+            FROM campaigns
+            ORDER BY id DESC
         """).fetchall()
-    ]
 
-    c.close()
+        groups = [
+            r["group_name"]
+            for r in c.execute("""
+                SELECT DISTINCT group_name
+                FROM contacts
+                WHERE group_name IS NOT NULL
+                ORDER BY group_name
+            """).fetchall()
+        ]
+
+    finally:
+
+        c.close()
+
+    # =====================================================
+    # GOOGLE DRIVE VARIABLES
+    # =====================================================
+
+    drive_connected = False
+
+    selected_drive_file = {}
+
+    # =====================================================
+    # CAMPAIGNS PAGE
+    # =====================================================
 
     return render_template(
         "campaigns.html",
         rows=rows,
-        groups=groups
+        groups=groups,
+        drive_connected=drive_connected,
+        selected_drive_file=selected_drive_file
     )
-
-
 
 # =========================================================
 # DELETE CAMPAIGN
