@@ -1111,7 +1111,7 @@ if campaign_type == "single":
 
     group_name = "__SINGLE__:" + single_number
 
-        if not name or not message:
+    if not name or not message:
             flash(
                 "Campaign name और message जरूरी है."
             )
