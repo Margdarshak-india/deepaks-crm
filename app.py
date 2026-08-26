@@ -510,7 +510,7 @@ def import_csv_text(text):
 
     try:
         
-               for row in reader:
+        for row in reader:
 
             name = (
                 row.get("name")
