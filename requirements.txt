@@ -1,4 +1,8 @@
-Flask>=3.0,<4
-requests>=2.31,<3
-gunicorn
+Flask
 psycopg2-binary
+requests
+gunicorn
+google-api-python-client
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
