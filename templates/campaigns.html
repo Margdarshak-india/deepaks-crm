@@ -50,13 +50,44 @@ td,th{padding:12px;border-bottom:1px solid #e5e7eb;text-align:left}
 <label>Campaign Name</label>
 <input name="name" required>
 
-<label>Group</label>
-<select name="group_name">
-<option value="">All contacts</option>
-{% for group in groups %}
-<option value="{{ group }}">{{ group }}</option>
-{% endfor %}
+<label>Campaign Type</label>
+<select name="campaign_type" id="campaign_type" onchange="toggleSingleNumber()">
+    <option value="group">Group / Contacts</option>
+    <option value="single">Single Number</option>
 </select>
+
+<div id="group_box">
+    <label>Group</label>
+    <select name="group_name">
+        <option value="">All contacts</option>
+        {% for group in groups %}
+        <option value="{{ group }}">{{ group }}</option>
+        {% endfor %}
+    </select>
+</div>
+
+<div id="single_number_box" style="display:none;">
+    <label>WhatsApp Number</label>
+    <input
+        type="text"
+        name="single_number"
+        placeholder="919977483335"
+        inputmode="numeric"
+    >
+    <p class="small">Enter the complete WhatsApp number with country code.</p>
+</div>
+
+<script>
+function toggleSingleNumber() {
+    const type = document.getElementById("campaign_type").value;
+
+    document.getElementById("group_box").style.display =
+        type === "group" ? "block" : "none";
+
+    document.getElementById("single_number_box").style.display =
+        type === "single" ? "block" : "none";
+}
+</script>
 
 <label>Message</label>
 <textarea name="message" placeholder="Hello {{name}}, ..."></textarea>
