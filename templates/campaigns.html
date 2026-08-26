@@ -17,11 +17,13 @@ textarea{min-height:180px}
 button,.btn{display:inline-block;background:#1976b8;color:#fff;border:0;border-radius:9px;padding:12px 18px;font-size:16px;text-decoration:none;cursor:pointer}
 .secondary{background:#586575}
 .success{background:#168a52}
+.danger{background:#dc3545}
 .attachment{background:#eef7ff;border:1px solid #9bc9ef;padding:15px;border-radius:10px;margin-top:12px}
 .small{color:#64748b;font-size:14px}
 table{width:100%;border-collapse:collapse}
 td,th{padding:12px;border-bottom:1px solid #e5e7eb;text-align:left}
 .flash{background:#fff3cd;padding:12px;border-radius:8px;margin-bottom:12px}
+.action-buttons{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -93,22 +95,40 @@ td,th{padding:12px;border-bottom:1px solid #e5e7eb;text-align:left}
 <h2>Campaigns</h2>
 <table>
 <tr><th>Name</th><th>Group</th><th>Status</th><th>Action</th></tr>
+
 {% for row in rows %}
 <tr>
 <td>{{ row.name }}</td>
 <td>{{ row.group_name or 'All contacts' }}</td>
 <td>{{ row.status }}</td>
 <td>
+<div class="action-buttons">
+
 <form method="post" action="/campaign/{{ row.id }}/send"
       onsubmit="return confirm('Send this campaign now?');">
 <button class="success" type="submit">Send</button>
 </form>
+
+<form method="post"
+      action="{{ url_for('delete_campaign', cid=row.id) }}"
+      onsubmit="return confirm('क्या आप इस campaign को delete करना चाहते हैं? इस campaign के WhatsApp message records भी delete होंगे।');">
+<button class="danger" type="submit">🗑 Delete</button>
+</form>
+
+</div>
+
 {% if row.drive_file_name %}
 <div class="small">📎 {{ row.drive_file_name }}</div>
 {% endif %}
 </td>
 </tr>
+
+{% else %}
+<tr>
+<td colspan="4">No campaigns.</td>
+</tr>
 {% endfor %}
+
 </table>
 </div>
 </div>
