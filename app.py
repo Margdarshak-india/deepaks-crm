@@ -509,7 +509,7 @@ def import_csv_text(text):
     skipped = 0
 
     try:
-        
+
         for row in reader:
 
             name = (
@@ -542,31 +542,49 @@ def import_csv_text(text):
 
             group = group or "General"
 
-            if phone:
+            if not phone:
+                skipped += 1
+                continue
 
-                try:
+            try:
 
-                    c.execute("""
-                        INSERT INTO contacts
-                        (
-                            name,
-                            phone,
-                            group_name
-                        )
-                        VALUES (?, ?, ?)
-                    """, (
+                cursor = c.execute("""
+                    INSERT INTO contacts
+                    (
                         name,
                         phone,
-                        group
-                    ))
+                        group_name
+                    )
+                    VALUES (?, ?, ?)
+                    ON CONFLICT (phone) DO NOTHING
+                """, (
+                    name,
+                    phone,
+                    group
+                ))
 
+                if cursor.rowcount == 1:
                     added += 1
+                else:
+                    skipped += 1
 
-                except IntegrityError:
+            except Exception:
+                c.rollback()
+                skipped += 1
 
-                    c.rollback()
+        c.commit()
 
-    return added, f"{skipped} rows skipped."
+        return added, f"{skipped} rows skipped."
+
+    except Exception as e:
+
+        c.rollback()
+
+        return 0, f"Import error: {str(e)}"
+
+    finally:
+
+        c.close()
 
 
 # =========================================================
