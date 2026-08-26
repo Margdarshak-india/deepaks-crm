@@ -2,7 +2,3 @@ Flask
 psycopg2-binary
 requests
 gunicorn
-google-api-python-client
-google-auth
-google-auth-oauthlib
-google-auth-httplib2
