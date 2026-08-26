@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Google Drive</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f5f7fb;margin:0;color:#172033}
+nav{background:#123f69;color:#fff;padding:18px}
+nav a{color:#fff;text-decoration:none;margin-right:20px}
+.container{max-width:950px;margin:30px auto;padding:0 16px}
+.card{background:#fff;padding:22px;border-radius:16px;margin-bottom:14px;box-shadow:0 3px 15px #0001}
+.btn{background:#1976b8;color:white;text-decoration:none;border:0;border-radius:8px;padding:10px 15px;display:inline-block}
+.name{font-weight:bold;font-size:18px}
+.small{color:#64748b;font-size:13px}
+</style>
+</head>
+<body>
+<nav>
+<a href="/campaigns">Campaigns</a>
+<a href="/settings">Settings</a>
+</nav>
+<div class="container">
+<h1>Select Google Drive Attachment</h1>
+<p>Select the file you want to send on WhatsApp.</p>
+
+{% if not files %}
+<div class="card">No files found in this Google Drive.</div>
+{% endif %}
+
+{% for file in files %}
+<div class="card">
+<div class="name">{{ file.name }}</div>
+<div class="small">
+{{ file.mimeType }}
+{% if file.size %} · {{ file.size }} bytes{% endif %}
+</div>
+<br>
+<a class="btn"
+href="/campaigns?drive_file_id={{ file.id|urlencode }}&drive_file_name={{ file.name|urlencode }}&drive_mime_type={{ file.mimeType|urlencode }}">
+Use this file in Campaign
+</a>
+</div>
+{% endfor %}
+</div>
+</body>
+</html>
