@@ -1093,23 +1093,30 @@ def campaigns():
         ).strip()
 
         campaign_type = request.form.get(
-    "campaign_type",
-    "group"
-).strip()
+            "campaign_type",
+            "group"
+        ).strip()
 
-single_number = request.form.get(
-    "single_number",
-    ""
-).strip()
+        single_number = request.form.get(
+            "single_number",
+            ""
+        ).strip()
 
-if campaign_type == "single":
-    single_number = clean_phone(single_number)
+        if campaign_type == "single":
 
-    if not single_number:
-        flash("Please enter a valid WhatsApp number.")
-        return redirect(url_for("campaigns"))
+            single_number = clean_phone(
+                single_number
+            )
 
-        group_name = "__SINGLE__:" + single_number
+            if not single_number:
+                flash(
+                    "Please enter a valid WhatsApp number."
+                )
+                return redirect(
+                    url_for("campaigns")
+                )
+
+            group_name = "__SINGLE__:" + single_number
 
         if not name or not message:
             flash(
@@ -1158,7 +1165,6 @@ if campaign_type == "single":
         return redirect(
             url_for("campaigns")
         )
-
     # =====================================================
     # GET CAMPAIGNS
     # =====================================================
