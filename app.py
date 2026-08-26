@@ -850,6 +850,39 @@ def google_drive_import(file_id):
     return redirect(url_for("google_drive"))
 
 
+
+# =========================================================
+# DELETE CONTACT
+# =========================================================
+
+@app.route("/contacts/delete/<int:contact_id>", methods=["POST"])
+def delete_contact(contact_id):
+    c = db()
+    try:
+        contact = c.execute("""
+            SELECT name FROM contacts WHERE id=?
+        """, (contact_id,)).fetchone()
+
+        if not contact:
+            flash("Contact नहीं मिला.")
+            return redirect(url_for("contacts"))
+
+        c.execute("""
+            DELETE FROM contacts WHERE id=?
+        """, (contact_id,))
+
+        c.commit()
+        flash(f"Contact '{contact['name']}' deleted successfully.")
+
+    except Exception as e:
+        c.rollback()
+        flash(f"Contact delete error: {str(e)}")
+
+    finally:
+        c.close()
+
+    return redirect(url_for("contacts"))
+
 # =========================================================
 # CAMPAIGNS
 # =========================================================
@@ -905,6 +938,45 @@ def campaigns():
         groups=groups
     )
 
+
+
+# =========================================================
+# DELETE CAMPAIGN
+# =========================================================
+
+@app.route("/campaign/<int:cid>/delete", methods=["POST"])
+def delete_campaign(cid):
+    c = db()
+    try:
+        campaign = c.execute("""
+            SELECT id, name FROM campaigns WHERE id=?
+        """, (cid,)).fetchone()
+
+        if not campaign:
+            flash("Campaign नहीं मिला.")
+            return redirect(url_for("campaigns"))
+
+        c.execute("""
+            DELETE FROM whatsapp_messages
+            WHERE campaign_id=?
+        """, (cid,))
+
+        c.execute("""
+            DELETE FROM campaigns
+            WHERE id=?
+        """, (cid,))
+
+        c.commit()
+        flash(f"Campaign '{campaign['name']}' deleted successfully.")
+
+    except Exception as e:
+        c.rollback()
+        flash(f"Campaign delete error: {str(e)}")
+
+    finally:
+        c.close()
+
+    return redirect(url_for("campaigns"))
 
 # =========================================================
 # SEND CAMPAIGN
