@@ -1,47 +1,78 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Google Drive</title>
-<style>
-body{font-family:Arial,sans-serif;background:#f5f7fb;margin:0;color:#172033}
-nav{background:#123f69;color:#fff;padding:18px}
-nav a{color:#fff;text-decoration:none;margin-right:20px}
-.container{max-width:950px;margin:30px auto;padding:0 16px}
-.card{background:#fff;padding:22px;border-radius:16px;margin-bottom:14px;box-shadow:0 3px 15px #0001}
-.btn{background:#1976b8;color:white;text-decoration:none;border:0;border-radius:8px;padding:10px 15px;display:inline-block}
-.name{font-weight:bold;font-size:18px}
-.small{color:#64748b;font-size:13px}
-</style>
+    <meta charset="utf-8">
+    <title>Google Drive - Deepak CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body{font-family:Arial,sans-serif;background:#f5f7fb;margin:0;padding:30px}
+        .box{max-width:1000px;margin:auto;background:#fff;padding:25px;border-radius:14px;box-shadow:0 2px 12px #0001}
+        h1{margin-top:0}
+        .btn{display:inline-block;padding:10px 16px;border-radius:8px;text-decoration:none;border:0;cursor:pointer;background:#1769e0;color:#fff}
+        .btn.red{background:#d93025}
+        .btn.green{background:#168a45}
+        .msg{padding:12px;background:#fff4d6;border-radius:8px;margin:15px 0}
+        table{width:100%;border-collapse:collapse;margin-top:20px}
+        th,td{padding:12px;border-bottom:1px solid #eee;text-align:left}
+        .muted{color:#666}
+    </style>
 </head>
 <body>
-<nav>
-<a href="/campaigns">Campaigns</a>
-<a href="/settings">Settings</a>
-</nav>
-<div class="container">
-<h1>Select Google Drive Attachment</h1>
-<p>Select the file you want to send on WhatsApp.</p>
+<div class="box">
+    <h1>Google Drive</h1>
 
-{% if not files %}
-<div class="card">No files found in this Google Drive.</div>
-{% endif %}
+    {% if error %}
+        <div class="msg">{{ error }}</div>
+    {% endif %}
 
-{% for file in files %}
-<div class="card">
-<div class="name">{{ file.name }}</div>
-<div class="small">
-{{ file.mimeType }}
-{% if file.size %} · {{ file.size }} bytes{% endif %}
-</div>
-<br>
-<a class="btn"
-href="/campaigns?drive_file_id={{ file.id|urlencode }}&drive_file_name={{ file.name|urlencode }}&drive_mime_type={{ file.mimeType|urlencode }}">
-Use this file in Campaign
-</a>
-</div>
-{% endfor %}
+    {% if not connected %}
+        <p class="muted">Google Drive को Deepak CRM से connect करें.</p>
+        <a class="btn" href="{{ url_for('google_login') }}">Connect Google Drive</a>
+    {% else %}
+        <p><strong>Status:</strong> Google Drive Connected ✅</p>
+        <a class="btn red" href="{{ url_for('google_logout') }}">Disconnect</a>
+
+        {% if files %}
+        <table>
+            <thead>
+                <tr>
+                    <th>File</th>
+                    <th>Type</th>
+                    <th>Modified</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for file in files %}
+                <tr>
+                    <td>{{ file.get('name','') }}</td>
+                    <td>
+                        {% if file.get('mimeType') == 'application/vnd.google-apps.spreadsheet' %}
+                            Google Sheet
+                        {% else %}
+                            CSV
+                        {% endif %}
+                    </td>
+                    <td>{{ file.get('modifiedTime','') }}</td>
+                    <td>
+                        <form method="post"
+                              action="{{ url_for('google_drive_import', file_id=file.get('id')) }}">
+                            <input type="hidden"
+                                   name="mime_type"
+                                   value="{{ file.get('mimeType','text/csv') }}">
+                            <button class="btn green" type="submit">
+                                Import Contacts
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <p class="muted">Google Drive में CSV या Google Sheets नहीं मिली.</p>
+        {% endif %}
+    {% endif %}
 </div>
 </body>
 </html>
