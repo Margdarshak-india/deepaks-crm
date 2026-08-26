@@ -105,13 +105,13 @@ td,th{padding:12px;border-bottom:1px solid #e5e7eb;text-align:left}
 <div class="action-buttons">
 
 <form method="post" action="/campaign/{{ row.id }}/send"
-      onsubmit="return confirm('Send this campaign now?');">
+      onsubmit="return confirm('Are you sure you want to delete this campaign? All WhatsApp message records associated with this campaign will also be deleted.');">
 <button class="success" type="submit">Send</button>
 </form>
 
 <form method="post"
       action="{{ url_for('delete_campaign', cid=row.id) }}"
-      onsubmit="return confirm('क्या आप इस campaign को delete करना चाहते हैं? इस campaign के WhatsApp message records भी delete होंगे।');">
+      onsubmit="return confirm('Are you sure you want to delete this campaign? All WhatsApp message records associated with this campaign will also be deleted.');">
 <button class="danger" type="submit">🗑 Delete</button>
 </form>
 
