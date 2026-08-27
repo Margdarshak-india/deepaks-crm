@@ -509,16 +509,12 @@ def import_csv_text(text):
     skipped = 0
 
     try:
-
         for row in reader:
-
             name = (
                 row.get("name")
                 or row.get("Name")
-                or row.get("student name")
-                or row.get("Student Name")
-                or row.get("student_name")
-                or row.get("Student_Name")
+                or row.get("full_name")
+                or row.get("Full Name")
                 or ""
             ).strip()
 
@@ -529,6 +525,8 @@ def import_csv_text(text):
                 or row.get("Phone")
                 or row.get("mobile")
                 or row.get("Mobile")
+                or row.get("phone_number")
+                or row.get("Phone Number")
                 or ""
             ).strip()
 
@@ -537,6 +535,8 @@ def import_csv_text(text):
             group = (
                 row.get("group")
                 or row.get("Group")
+                or row.get("group_name")
+                or row.get("Group Name")
                 or "General"
             ).strip()
 
@@ -547,26 +547,17 @@ def import_csv_text(text):
                 continue
 
             try:
-
-                cursor = c.execute("""
+                c.execute("""
                     INSERT INTO contacts
-                    (
-                        name,
-                        phone,
-                        group_name
-                    )
+                    (name, phone, group_name)
                     VALUES (?, ?, ?)
                     ON CONFLICT (phone) DO NOTHING
-                """, (
-                    name,
-                    phone,
-                    group
-                ))
+                """, (name, phone, group))
 
-                if cursor.rowcount == 1:
-                    added += 1
-                else:
-                    skipped += 1
+                if c.connection.info.transaction_status:
+                    pass
+
+                added += 1
 
             except Exception:
                 c.rollback()
@@ -574,17 +565,14 @@ def import_csv_text(text):
 
         c.commit()
 
-        return added, f"{skipped} rows skipped."
-
-    except Exception as e:
-
+    except Exception:
         c.rollback()
-
-        return 0, f"Import error: {str(e)}"
+        raise
 
     finally:
-
         c.close()
+
+    return added, f"{skipped} rows skipped."
 
 
 # =========================================================
@@ -647,204 +635,30 @@ def dashboard():
         recent=recent
     )
 
+
 # =========================================================
 # CONTACTS
 # =========================================================
 
-@app.route(
-    "/contacts",
-    methods=["GET", "POST"]
-)
+@app.route("/contacts", methods=["GET", "POST"])
 def contacts():
-
     if request.method == "POST":
-
         f = request.files.get("file")
 
         if not f:
             flash("CSV file select करें.")
-            return redirect(
-                url_for("contacts")
-            )
+            return redirect(url_for("contacts"))
 
         text = f.read().decode(
             "utf-8-sig",
             errors="ignore"
         )
 
-        reader = csv.DictReader(
-            io.StringIO(text)
-        )
+        added, extra = import_csv_text(text)
 
-        c = db()
+        flash(f"{added} contacts imported. {extra}")
 
-        added = 0
-        skipped = 0
-
-        try:
-
-            for row in reader:
-
-                # =================================================
-                # FIND NAME FROM MULTIPLE POSSIBLE COLUMN NAMES
-                # =================================================
-
-                name = ""
-
-                name_columns = [
-                    "Student Name",
-                    "student name",
-                    "STUDENT NAME",
-                    "Name",
-                    "name",
-                    "Full Name",
-                    "full name",
-                    "Student",
-                    "student",
-                    "Customer Name",
-                    "customer name"
-                ]
-
-                for column in name_columns:
-
-                    value = row.get(column)
-
-                    if value and str(value).strip():
-
-                        name = str(value).strip()
-                        break
-
-                # =================================================
-                # FIND PHONE FROM MULTIPLE POSSIBLE COLUMN NAMES
-                # =================================================
-
-                phone = ""
-
-                phone_columns = [
-                    "Mobile",
-                    "mobile",
-                    "MOBILE",
-                    "Mobile Number",
-                    "mobile number",
-                    "Phone",
-                    "phone",
-                    "Phone Number",
-                    "phone number",
-                    "WhatsApp",
-                    "whatsapp",
-                    "WhatsApp Number",
-                    "whatsapp number"
-                ]
-
-                for column in phone_columns:
-
-                    value = row.get(column)
-
-                    if value and str(value).strip():
-
-                        phone = str(value).strip()
-                        break
-
-                phone = clean_phone(phone)
-
-                # =================================================
-                # GROUP
-                # =================================================
-
-                group = ""
-
-                group_columns = [
-                    "Group",
-                    "group",
-                    "GROUP",
-                    "Group Name",
-                    "group name"
-                ]
-
-                for column in group_columns:
-
-                    value = row.get(column)
-
-                    if value and str(value).strip():
-
-                        group = str(value).strip()
-                        break
-
-                if not group:
-                    group = "General"
-
-                # =================================================
-                # SKIP ROW IF PHONE IS EMPTY
-                # =================================================
-
-                if not phone:
-
-                    skipped += 1
-                    continue
-
-                # =================================================
-                # IF NAME IS EMPTY
-                # DO NOT USE "Customer"
-                # =================================================
-
-                if not name:
-
-                    name = "Unknown"
-
-                # =================================================
-                # INSERT CONTACT
-                # =================================================
-
-                try:
-
-                    c.execute("""
-                        INSERT INTO contacts
-                        (
-                            name,
-                            phone,
-                            group_name
-                        )
-                        VALUES (?, ?, ?)
-                    """, (
-                        name,
-                        phone,
-                        group
-                    ))
-
-                    added += 1
-
-                except IntegrityError:
-
-                    # Duplicate phone number
-                    c.rollback()
-                    skipped += 1
-
-            c.commit()
-
-            flash(
-                f"{added} contacts imported successfully. "
-                f"{skipped} skipped."
-            )
-
-        except Exception as e:
-
-            c.rollback()
-
-            flash(
-                f"Import error: {str(e)}"
-            )
-
-        finally:
-
-            c.close()
-
-        return redirect(
-            url_for("contacts")
-        )
-
-    # =========================================================
-    # SHOW CONTACTS
-    # =========================================================
+        return redirect(url_for("contacts"))
 
     c = db()
 
@@ -860,6 +674,7 @@ def contacts():
         "contacts.html",
         rows=rows
     )
+
 
 # =========================================================
 # GOOGLE DRIVE
@@ -1035,221 +850,61 @@ def google_drive_import(file_id):
     return redirect(url_for("google_drive"))
 
 
-
-# =========================================================
-# DELETE CONTACT
-# =========================================================
-
-@app.route("/contacts/delete/<int:contact_id>", methods=["POST"])
-def delete_contact(contact_id):
-    c = db()
-    try:
-        contact = c.execute("""
-            SELECT name FROM contacts WHERE id=?
-        """, (contact_id,)).fetchone()
-
-        if not contact:
-            flash("Contact नहीं मिला.")
-            return redirect(url_for("contacts"))
-
-        c.execute("""
-            DELETE FROM contacts WHERE id=?
-        """, (contact_id,))
-
-        c.commit()
-        flash(f"Contact '{contact['name']}' deleted successfully.")
-
-    except Exception as e:
-        c.rollback()
-        flash(f"Contact delete error: {str(e)}")
-
-    finally:
-        c.close()
-
-    return redirect(url_for("contacts"))
-
 # =========================================================
 # CAMPAIGNS
 # =========================================================
 
 @app.route("/campaigns", methods=["GET", "POST"])
 def campaigns():
-
     if request.method == "POST":
-
-        name = request.form.get(
-            "name",
-            ""
-        ).strip()
-
-        message = request.form.get(
-            "message",
-            ""
-        ).strip()
-
-        group_name = request.form.get(
-            "group_name",
-            ""
-        ).strip()
-
-        campaign_type = request.form.get(
-            "campaign_type",
-            "group"
-        ).strip()
-
-        single_number = request.form.get(
-            "single_number",
-            ""
-        ).strip()
-
-        if campaign_type == "single":
-
-            single_number = clean_phone(
-                single_number
-            )
-
-            if not single_number:
-                flash(
-                    "Please enter a valid WhatsApp number."
-                )
-                return redirect(
-                    url_for("campaigns")
-                )
-
-            group_name = "__SINGLE__:" + single_number
+        name = request.form.get("name", "").strip()
+        message = request.form.get("message", "").strip()
+        group_name = request.form.get("group_name", "").strip()
 
         if not name or not message:
-            flash(
-                "Campaign name and message are required."
-            )
-            return redirect(
-                url_for("campaigns")
-            )
+            flash("Campaign name और message जरूरी है.")
+            return redirect(url_for("campaigns"))
 
         c = db()
 
-        try:
+        c.execute("""
+            INSERT INTO campaigns
+            (name, message, group_name)
+            VALUES (?, ?, ?)
+        """, (name, message, group_name))
 
-            c.execute("""
-                INSERT INTO campaigns
-                (
-                    name,
-                    message,
-                    group_name
-                )
-                VALUES (?, ?, ?)
-            """, (
-                name,
-                message,
-                group_name
-            ))
+        c.commit()
+        c.close()
 
-            c.commit()
-
-            flash(
-                "Campaign saved as Draft."
-            )
-
-        except Exception as e:
-
-            c.rollback()
-
-            flash(
-                f"Campaign error: {str(e)}"
-            )
-
-        finally:
-
-            c.close()
-
-        return redirect(
-            url_for("campaigns")
-        )
-    # =====================================================
-    # GET CAMPAIGNS
-    # =====================================================
+        flash("Campaign saved as Draft.")
+        return redirect(url_for("campaigns"))
 
     c = db()
 
-    try:
+    rows = c.execute("""
+        SELECT *
+        FROM campaigns
+        ORDER BY id DESC
+    """).fetchall()
 
-        rows = c.execute("""
-            SELECT *
-            FROM campaigns
-            ORDER BY id DESC
+    groups = [
+        r["group_name"]
+        for r in c.execute("""
+            SELECT DISTINCT group_name
+            FROM contacts
+            WHERE group_name IS NOT NULL
+            ORDER BY group_name
         """).fetchall()
+    ]
 
-        groups = [
-            r["group_name"]
-            for r in c.execute("""
-                SELECT DISTINCT group_name
-                FROM contacts
-                WHERE group_name IS NOT NULL
-                ORDER BY group_name
-            """).fetchall()
-        ]
-
-    finally:
-
-        c.close()
-
-    # =====================================================
-    # GOOGLE DRIVE VARIABLES
-    # =====================================================
-
-    drive_connected = False
-
-    selected_drive_file = {}
-
-    # =====================================================
-    # CAMPAIGNS PAGE
-    # =====================================================
+    c.close()
 
     return render_template(
         "campaigns.html",
         rows=rows,
-        groups=groups,
-        drive_connected=drive_connected,
-        selected_drive_file=selected_drive_file
+        groups=groups
     )
 
-# =========================================================
-# DELETE CAMPAIGN
-# =========================================================
-
-@app.route("/campaign/<int:cid>/delete", methods=["POST"])
-def delete_campaign(cid):
-    c = db()
-    try:
-        campaign = c.execute("""
-            SELECT id, name FROM campaigns WHERE id=?
-        """, (cid,)).fetchone()
-
-        if not campaign:
-            flash("Campaign नहीं मिला.")
-            return redirect(url_for("campaigns"))
-
-        c.execute("""
-            DELETE FROM whatsapp_messages
-            WHERE campaign_id=?
-        """, (cid,))
-
-        c.execute("""
-            DELETE FROM campaigns
-            WHERE id=?
-        """, (cid,))
-
-        c.commit()
-        flash(f"Campaign '{campaign['name']}' deleted successfully.")
-
-    except Exception as e:
-        c.rollback()
-        flash(f"Campaign delete error: {str(e)}")
-
-    finally:
-        c.close()
-
-    return redirect(url_for("campaigns"))
 
 # =========================================================
 # SEND CAMPAIGN
@@ -1280,77 +935,31 @@ def send_campaign(cid):
             c.commit()
 
             flash(
-                "Please configure WHATSAPP_ACCESS_TOKEN and "
-                "WHATSAPP_PHONE_NUMBER_ID."
+                "WHATSAPP_ACCESS_TOKEN और "
+                "WHATSAPP_PHONE_NUMBER_ID configure करें."
             )
 
             return redirect(url_for("campaigns"))
 
-        group_name = campaign["group_name"] or ""
+        q = "SELECT * FROM contacts"
+        params = ()
 
-        # =====================================================
-        # SINGLE NUMBER CAMPAIGN
-        # =====================================================
+        if campaign["group_name"]:
+            q += " WHERE group_name=?"
+            params = (campaign["group_name"],)
 
-        if group_name.startswith("__SINGLE__:"):
-
-            single_number = group_name.replace(
-                "__SINGLE__:",
-                "",
-                1
-            ).strip()
-
-            single_number = clean_phone(single_number)
-
-            if not single_number:
-                flash("Invalid WhatsApp number.")
-                return redirect(url_for("campaigns"))
-
-            contacts_list = [{
-                "id": None,
-                "name": "Customer",
-                "phone": single_number
-            }]
-
-        # =====================================================
-        # GROUP / ALL CONTACTS CAMPAIGN
-        # =====================================================
-
-        else:
-
-            q = "SELECT * FROM contacts"
-            params = ()
-
-            if group_name:
-                q += " WHERE group_name=?"
-                params = (group_name,)
-
-            contacts_list = c.execute(
-                q,
-                params
-            ).fetchall()
+        contacts_list = c.execute(q, params).fetchall()
 
         sent = 0
         failed = 0
 
-        # =====================================================
-        # SEND MESSAGES
-        # =====================================================
-
         for contact in contacts_list:
-
             body = campaign["message"].replace(
                 "{{name}}",
-                contact["name"] or "Customer"
+                contact["name"]
             )
 
-            phone = clean_phone(
-                contact["phone"]
-            )
-
-            if not phone:
-                failed += 1
-                continue
+            phone = clean_phone(contact["phone"])
 
             ok, message_id, response = send_whatsapp_text(
                 phone,
@@ -1361,7 +970,6 @@ def send_campaign(cid):
                 status = "accepted"
                 sent += 1
                 error_text = None
-
             else:
                 status = "failed"
                 failed += 1
@@ -1374,12 +982,7 @@ def send_campaign(cid):
                 else:
                     error_text = str(response)
 
-            # =================================================
-            # SAVE WHATSAPP MESSAGE RECORD
-            # =================================================
-
             try:
-
                 c.execute("""
                     INSERT INTO whatsapp_messages
                     (
@@ -1407,7 +1010,6 @@ def send_campaign(cid):
                 c.commit()
 
             except Exception as db_error:
-
                 print(
                     "MESSAGE DATABASE ERROR:",
                     str(db_error)
@@ -1418,10 +1020,6 @@ def send_campaign(cid):
                 if ok:
                     sent -= 1
                     failed += 1
-
-        # =====================================================
-        # UPDATE CAMPAIGN STATUS
-        # =====================================================
 
         c.execute("""
             UPDATE campaigns
@@ -1439,36 +1037,26 @@ def send_campaign(cid):
             f"{failed} failed."
         )
 
-        return redirect(
-            url_for("campaigns")
-        )
+        return redirect(url_for("campaigns"))
 
     except Exception as e:
-
-        print(
-            "CAMPAIGN SEND ERROR:",
-            str(e)
-        )
+        print("CAMPAIGN SEND ERROR:", str(e))
 
         try:
             c.rollback()
         except Exception:
             pass
 
-        flash(
-            f"Campaign error: {str(e)}"
-        )
+        flash(f"Campaign error: {str(e)}")
 
-        return redirect(
-            url_for("campaigns")
-        )
+        return redirect(url_for("campaigns"))
 
     finally:
-
         try:
             c.close()
         except Exception:
             pass
+
 
 # =========================================================
 # WEBHOOK VERIFY
@@ -1896,76 +1484,3 @@ if __name__ == "__main__":
         port=port,
         debug=False
     )
-
-# =========================================================
-# DELETE SELECTED CONTACTS
-# =========================================================
-
-@app.route("/contacts/delete-selected", methods=["POST"])
-def delete_selected_contacts():
-
-    ids = request.form.getlist("contact_ids")
-
-    if not ids:
-        flash("No contacts selected.")
-        return redirect(url_for("contacts"))
-
-    c = db()
-
-    try:
-
-        c.execute(
-            """
-            DELETE FROM contacts
-            WHERE id = ANY(%s)
-            """,
-            (ids,)
-        )
-
-        deleted = c.execute(
-            "SELECT 1"
-        ).rowcount
-
-        c.commit()
-
-        flash("Selected contacts deleted successfully.")
-
-    except Exception as e:
-
-        c.rollback()
-        flash(f"Delete error: {str(e)}")
-
-    finally:
-
-        c.close()
-
-    return redirect(url_for("contacts"))
-
-
-# =========================================================
-# DELETE ALL CONTACTS
-# =========================================================
-
-@app.route("/contacts/delete-all", methods=["POST"])
-def delete_all_contacts():
-
-    c = db()
-
-    try:
-
-        c.execute("DELETE FROM contacts")
-
-        c.commit()
-
-        flash("All contacts deleted successfully.")
-
-    except Exception as e:
-
-        c.rollback()
-        flash(f"Delete error: {str(e)}")
-
-    finally:
-
-        c.close()
-
-    return redirect(url_for("contacts"))
