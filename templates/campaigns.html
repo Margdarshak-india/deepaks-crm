@@ -1,12 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
     <meta charset="UTF-8">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
 
     <title>Campaigns - Deepak's CRM</title>
 
@@ -25,149 +24,189 @@
         }
 
         .container {
-            width: 95%;
+            width: 94%;
             max-width: 1200px;
             margin: 30px auto;
         }
 
-        .header {
+        .card {
             background: #ffffff;
-            padding: 22px;
-            border-radius: 12px;
-            box-shadow: 0 3px 12px rgba(0,0,0,0.08);
-            margin-bottom: 20px;
+            border-radius: 14px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.08);
         }
 
-        .header h1 {
-            margin: 0 0 8px;
+        h1 {
+            margin: 0 0 25px 0;
+            color: #168bc4;
             font-size: 28px;
         }
 
-        .header p {
-            margin: 0;
-            color: #666;
-        }
-
-        .card {
-            background: #ffffff;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 3px 12px rgba(0,0,0,0.08);
-            margin-bottom: 25px;
-        }
-
-        .card h2 {
+        h2 {
             margin-top: 0;
-            margin-bottom: 20px;
-        }
-
-        .form-group {
-            margin-bottom: 18px;
+            color: #168bc4;
+            font-size: 22px;
         }
 
         label {
             display: block;
-            font-weight: 600;
+            margin-top: 16px;
             margin-bottom: 7px;
+            font-weight: bold;
+            color: #444;
         }
 
         input,
-        textarea,
-        select {
+        select,
+        textarea {
             width: 100%;
-            padding: 12px;
-            border: 1px solid #d5dbe5;
+            padding: 12px 14px;
+            border: 1px solid #ccd6e0;
             border-radius: 8px;
             font-size: 15px;
+            outline: none;
             background: #fff;
         }
 
+        input:focus,
+        select:focus,
+        textarea:focus {
+            border-color: #168bc4;
+            box-shadow: 0 0 0 2px rgba(22,139,196,0.10);
+        }
+
         textarea {
-            min-height: 150px;
+            min-height: 140px;
             resize: vertical;
         }
 
-        input:focus,
-        textarea:focus,
-        select:focus {
-            outline: none;
-            border-color: #2196f3;
-        }
-
-        .radio-box {
+        .campaign-type {
             display: flex;
             gap: 25px;
-            margin-bottom: 15px;
+            align-items: center;
+            margin: 12px 0 5px 0;
         }
 
-        .radio-item {
+        .campaign-type label {
+            margin: 0;
+            font-weight: normal;
             display: flex;
             align-items: center;
             gap: 7px;
+            cursor: pointer;
         }
 
-        .radio-item input {
+        .campaign-type input[type="radio"] {
             width: auto;
         }
 
-        .hidden {
-            display: none !important;
+        .target-box {
+            margin-top: 15px;
         }
 
+        .single-mode {
+            margin-top: 15px;
+        }
+
+        .manual-box {
+            display: none;
+            margin-top: 12px;
+        }
+
+        .saved-contact-box {
+            display: block;
+            margin-top: 12px;
+        }
+
+        .hint {
+            font-size: 13px;
+            color: #777;
+            margin-top: 5px;
+        }
+
+        .attachment-box {
+            margin-top: 20px;
+            padding: 18px;
+            border: 1px solid #dce5ed;
+            border-radius: 10px;
+            background: #f8fbfd;
+        }
+
+        .attachment-header {
+            font-weight: bold;
+            color: #444;
+            margin-bottom: 10px;
+        }
+
+        .drive-status {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #777;
+        }
+
+        .selected-file {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 7px;
+            background: #e9f7ff;
+            color: #0879ad;
+            display: none;
+        }
+
+        .button-row {
+            margin-top: 22px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button,
         .btn {
             border: none;
             border-radius: 8px;
             padding: 11px 18px;
-            font-size: 14px;
-            font-weight: 600;
             cursor: pointer;
+            font-size: 14px;
             text-decoration: none;
             display: inline-block;
         }
 
-        .btn-primary {
-            background: #2196f3;
-            color: #fff;
+        .primary {
+            background: #159bd7;
+            color: white;
         }
 
-        .btn-primary:hover {
-            background: #1976d2;
+        .primary:hover {
+            background: #087fb8;
         }
 
-        .btn-success {
-            background: #16a085;
-            color: #fff;
+        .secondary {
+            background: #6c757d;
+            color: white;
         }
 
-        .btn-success:hover {
-            background: #138d75;
+        .send {
+            background: #12a6b8;
+            color: white;
         }
 
-        .btn-danger {
-            background: #e91e63;
-            color: #fff;
+        .send:hover {
+            background: #078b9b;
         }
 
-        .btn-danger:hover {
-            background: #c2185b;
+        .danger {
+            background: #e83e8c;
+            color: white;
         }
 
-        .btn-secondary {
-            background: #607d8b;
-            color: #fff;
+        .danger:hover {
+            background: #d52d78;
         }
 
-        .btn-secondary:hover {
-            background: #455a64;
-        }
-
-        .flash {
-            padding: 13px 16px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            background: #eaf4ff;
-            border: 1px solid #b8dcff;
-            color: #155b91;
+        .success {
+            background: #20a05a;
+            color: white;
         }
 
         .campaign-table-wrapper {
@@ -177,93 +216,80 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 800px;
-        }
-
-        th,
-        td {
-            padding: 13px 10px;
-            border-bottom: 1px solid #e5e5e5;
-            text-align: left;
-            vertical-align: middle;
+            min-width: 850px;
         }
 
         th {
-            background: #f5f7fa;
-            font-weight: 700;
+            background: #168bc4;
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e5e5;
+            vertical-align: top;
         }
 
         tr:hover td {
-            background: #fafcff;
-        }
-
-        .message-preview {
-            max-width: 300px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            background: #f8fbfd;
         }
 
         .status {
             display: inline-block;
-            padding: 5px 10px;
+            padding: 5px 9px;
             border-radius: 20px;
+            background: #e8f6ed;
+            color: #158044;
             font-size: 12px;
-            font-weight: 700;
+            font-weight: bold;
         }
 
-        .status-draft {
-            background: #fff3cd;
-            color: #856404;
+        .status.failed {
+            background: #ffe8e8;
+            color: #c62828;
         }
 
-        .status-accepted {
-            background: #d4edda;
-            color: #155724;
+        .status.partial {
+            background: #fff4d8;
+            color: #9a6b00;
         }
 
-        .status-partial {
-            background: #d1ecf1;
-            color: #0c5460;
+        .status.draft {
+            background: #eeeeee;
+            color: #555;
         }
 
-        .status-failed {
-            background: #f8d7da;
-            color: #721c24;
+        .message-preview {
+            max-width: 260px;
+            white-space: pre-wrap;
+            word-break: break-word;
         }
 
-        .action-box {
+        .attachment-name {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #0879ad;
+        }
+
+        .actions {
             display: flex;
-            gap: 8px;
-            align-items: center;
+            gap: 7px;
             flex-wrap: wrap;
         }
 
-        /*
-         * IMPORTANT:
-         * Send form and Delete form are intentionally
-         * separate. DO NOT put one form inside another.
-         */
-
-        .action-box form {
+        .actions form {
             margin: 0;
-            padding: 0;
         }
 
-        .help-text {
-            font-size: 13px;
-            color: #777;
-            margin-top: 6px;
-        }
-
-        .single-info {
-            background: #eef8ff;
-            border: 1px solid #c8e7ff;
-            padding: 12px;
+        .flash {
+            padding: 12px 15px;
+            margin-bottom: 15px;
             border-radius: 8px;
-            margin-top: 8px;
-            font-size: 13px;
-            color: #245b7a;
+            background: #e9f7ff;
+            color: #0879ad;
+            border: 1px solid #c8eafa;
         }
 
         .empty {
@@ -272,227 +298,160 @@
             color: #777;
         }
 
+        .drive-connect {
+            margin-top: 10px;
+        }
+
+        .drive-connect a {
+            text-decoration: none;
+            color: white;
+            background: #4285f4;
+            padding: 9px 14px;
+            border-radius: 7px;
+            display: inline-block;
+        }
+
+        .drive-connect a:hover {
+            background: #3367d6;
+        }
+
+        .required {
+            color: red;
+        }
+
         @media (max-width: 700px) {
 
             .container {
-                width: 94%;
+                width: 96%;
                 margin: 15px auto;
             }
 
             .card {
-                padding: 18px;
+                padding: 17px;
             }
 
-            .header h1 {
-                font-size: 23px;
+            h1 {
+                font-size: 24px;
             }
 
-            .radio-box {
+            .campaign-type {
                 flex-direction: column;
-                gap: 10px;
+                align-items: flex-start;
+                gap: 12px;
             }
 
-            .action-box {
+            .button-row {
                 flex-direction: column;
-                align-items: stretch;
             }
 
-            .action-box form,
-            .action-box .btn {
+            .button-row button,
+            .button-row a {
                 width: 100%;
+                text-align: center;
             }
-
         }
 
     </style>
+
 </head>
 
 <body>
 
 <div class="container">
 
-    <!-- =====================================================
-         HEADER
-         ===================================================== -->
-
-    <div class="header">
-
-        <h1>📢 Campaigns</h1>
-
-        <p>
-            Create and send WhatsApp campaigns
-        </p>
-
-    </div>
-
-
-    <!-- =====================================================
-         FLASH MESSAGES
-         ===================================================== -->
-
-    {% with messages = get_flashed_messages() %}
-
-        {% if messages %}
-
-            {% for message in messages %}
-
-                <div class="flash">
-                    {{ message }}
-                </div>
-
-            {% endfor %}
-
-        {% endif %}
-
-    {% endwith %}
-
-
-    <!-- =====================================================
-         CREATE CAMPAIGN
-         ===================================================== -->
-
     <div class="card">
 
-        <h2>Create Campaign</h2>
+        <h1>Create Campaign</h1>
+
+        {% with messages = get_flashed_messages() %}
+
+            {% if messages %}
+
+                {% for msg in messages %}
+
+                    <div class="flash">
+                        {{ msg }}
+                    </div>
+
+                {% endfor %}
+
+            {% endif %}
+
+        {% endwith %}
 
 
-        <!-- IMPORTANT:
-             This is ONLY the create campaign form.
-        -->
+        <form method="POST"
+              action="{{ url_for('campaigns') }}"
+              id="campaignForm">
 
-        <form
-            method="post"
-            action="{{ url_for('campaigns') }}"
-        >
+            <!-- ================================================= -->
+            <!-- CAMPAIGN NAME -->
+            <!-- ================================================= -->
 
-            <!-- Campaign Name -->
+            <label for="name">
+                Campaign Name
+                <span class="required">*</span>
+            </label>
 
-            <div class="form-group">
-
-                <label for="name">
-                    Campaign Name
-                </label>
-
-                <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    placeholder="Enter campaign name"
-                    required
-                >
-
-            </div>
-
-
-            <!-- Campaign Type -->
-
-            <div class="form-group">
-
-                <label>
-                    Campaign Type
-                </label>
-
-                <div class="radio-box">
-
-                    <label class="radio-item">
-
-                        <input
-                            type="radio"
-                            name="campaign_type"
-                            value="single"
-                            id="type_single"
-                            onchange="changeCampaignType()"
-                        >
-
-                        <span>
-                            Single Number
-                        </span>
-
-                    </label>
-
-
-                    <label class="radio-item">
-
-                        <input
-                            type="radio"
-                            name="campaign_type"
-                            value="group"
-                            id="type_group"
-                            checked
-                            onchange="changeCampaignType()"
-                        >
-
-                        <span>
-                            Group
-                        </span>
-
-                    </label>
-
-                </div>
-
-            </div>
-
-
-            <!-- =================================================
-                 SINGLE CONTACT
-                 ================================================= -->
-
-            <div
-                class="form-group hidden"
-                id="singleContactBox"
+            <input
+                type="text"
+                id="name"
+                name="name"
+                placeholder="Enter campaign name"
+                required
             >
 
-                <label for="single_contact_id">
 
-                    Select Contact
+            <!-- ================================================= -->
+            <!-- CAMPAIGN TYPE -->
+            <!-- ================================================= -->
+
+            <label>
+                Campaign Type
+            </label>
+
+            <div class="campaign-type">
+
+                <label>
+
+                    <input
+                        type="radio"
+                        name="campaign_type"
+                        value="single"
+                        id="singleRadio"
+                        onchange="changeCampaignType()"
+                    >
+
+                    Single Number
 
                 </label>
 
 
-                <select
-                    name="single_contact_id"
-                    id="single_contact_id"
-                >
+                <label>
 
-                    <option value="">
-                        -- Select Contact --
-                    </option>
+                    <input
+                        type="radio"
+                        name="campaign_type"
+                        value="group"
+                        id="groupRadio"
+                        checked
+                        onchange="changeCampaignType()"
+                    >
 
-                    {% for contact in contacts %}
+                    Group
 
-                        <option
-                            value="{{ contact.id }}"
-                        >
-                            {{ contact.name }}
-                            -
-                            {{ contact.phone }}
-                            {% if contact.group_name %}
-                                ({{ contact.group_name }})
-                            {% endif %}
-                        </option>
-
-                    {% endfor %}
-
-                </select>
-
-
-                <div class="single-info">
-
-                    Select a contact from your Contacts list.
-                    No manual WhatsApp number entry is required.
-
-                </div>
+                </label>
 
             </div>
 
 
-            <!-- =================================================
-                 GROUP
-                 ================================================= -->
+            <!-- ================================================= -->
+            <!-- GROUP TARGET -->
+            <!-- ================================================= -->
 
             <div
-                class="form-group"
                 id="groupBox"
+                class="target-box"
             >
 
                 <label for="group_name">
@@ -518,55 +477,262 @@
 
                 </select>
 
-                <div class="help-text">
+            </div>
 
-                    All contacts belonging to this group
-                    will receive the campaign.
+
+            <!-- ================================================= -->
+            <!-- SINGLE NUMBER TARGET -->
+            <!-- ================================================= -->
+
+            <div
+                id="singleBox"
+                class="single-mode"
+                style="display:none;"
+            >
+
+                <label>
+                    Select Number
+                </label>
+
+
+                <!-- ============================================= -->
+                <!-- SINGLE NUMBER MODE -->
+                <!-- ============================================= -->
+
+                <select
+                    name="target_mode"
+                    id="target_mode"
+                    onchange="changeSingleMode()"
+                >
+
+                    <option value="saved">
+                        Select from Saved Contacts
+                    </option>
+
+                    <option value="manual">
+                        Enter Number Manually
+                    </option>
+
+                </select>
+
+
+                <!-- ============================================= -->
+                <!-- SAVED CONTACT -->
+                <!-- ============================================= -->
+
+                <div
+                    id="savedContactBox"
+                    class="saved-contact-box"
+                >
+
+                    <label for="single_number">
+                        Select Contact
+                    </label>
+
+                    <select
+                        name="single_number"
+                        id="single_number"
+                    >
+
+                        <option value="">
+                            -- Select Contact --
+                        </option>
+
+                        {% for contact in contacts %}
+
+                            <option
+                                value="{{ contact.phone }}"
+                            >
+                                {{ contact.name }}
+                                -
+                                {{ contact.phone }}
+                            </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                    <div class="hint">
+                        Saved contact select करें.
+                    </div>
+
+                </div>
+
+
+                <!-- ============================================= -->
+                <!-- MANUAL NUMBER -->
+                <!-- ============================================= -->
+
+                <div
+                    id="manualBox"
+                    class="manual-box"
+                >
+
+                    <label for="manual_number">
+                        WhatsApp Number
+                    </label>
+
+                    <input
+                        type="text"
+                        name="manual_number"
+                        id="manual_number"
+                        placeholder="Example: 919977483335"
+                    >
+
+                    <div class="hint">
+                        Country code के साथ पूरा WhatsApp number डालें.
+                        Example: 919977483335
+                    </div>
 
                 </div>
 
             </div>
 
 
-            <!-- =================================================
-                 MESSAGE
-                 ================================================= -->
+            <!-- ================================================= -->
+            <!-- MESSAGE -->
+            <!-- ================================================= -->
 
-            <div class="form-group">
+            <label for="message">
+                Message
+            </label>
 
-                <label for="message">
-                    Message
-                </label>
+            <textarea
+                name="message"
+                id="message"
+                placeholder="Type your WhatsApp message here..."
+            ></textarea>
 
-                <textarea
-                    id="message"
-                    name="message"
-                    placeholder="Type your WhatsApp message here..."
-                    required
-                ></textarea>
+
+            <!-- ================================================= -->
+            <!-- GOOGLE DRIVE ATTACHMENT -->
+            <!-- ================================================= -->
+
+            <div class="attachment-box">
+
+                <div class="attachment-header">
+                    📎 Attachment from Google Drive
+                </div>
+
+
+                {% if google_connected is defined and google_connected %}
+
+                    <div class="drive-status">
+                        Google Drive connected.
+                    </div>
+
+                {% endif %}
+
+
+                {% if drive_error %}
+
+                    <div class="flash">
+                        Google Drive Error:
+                        {{ drive_error }}
+                    </div>
+
+                {% endif %}
+
+
+                {% if not drive_files %}
+
+                    <div class="drive-connect">
+
+                        <a href="{{ url_for('google_drive') }}">
+                            Connect Google Drive
+                        </a>
+
+                    </div>
+
+                    <div class="hint">
+                        Google Drive connect करके files select करें.
+                    </div>
+
+                {% else %}
+
+                    <label for="drive_file_id">
+                        Select Attachment
+                    </label>
+
+                    <select
+                        name="drive_file_id"
+                        id="drive_file_id"
+                        onchange="selectDriveFile()"
+                    >
+
+                        <option value="">
+                            -- No Attachment --
+                        </option>
+
+                        {% for file in drive_files %}
+
+                            <option
+                                value="{{ file.id }}"
+                                data-name="{{ file.name }}"
+                                data-mime="{{ file.mimeType }}"
+                            >
+                                {{ file.name }}
+                            </option>
+
+                        {% endfor %}
+
+                    </select>
+
+
+                    <input
+                        type="hidden"
+                        name="drive_file_name"
+                        id="drive_file_name"
+                    >
+
+
+                    <input
+                        type="hidden"
+                        name="drive_mime_type"
+                        id="drive_mime_type"
+                    >
+
+
+                    <div
+                        id="selectedFile"
+                        class="selected-file"
+                    >
+                    </div>
+
+
+                    <div class="hint">
+                        Google Drive से image, PDF, document,
+                        video या अन्य supported file select कर सकते हैं.
+                    </div>
+
+                {% endif %}
 
             </div>
 
 
-            <!-- =================================================
-                 SAVE
-                 ================================================= -->
+            <!-- ================================================= -->
+            <!-- SAVE -->
+            <!-- ================================================= -->
 
-            <button
-                type="submit"
-                class="btn btn-primary"
-            >
-                💾 Save Campaign
-            </button>
+            <div class="button-row">
+
+                <button
+                    type="submit"
+                    class="primary"
+                >
+                    💾 Save Campaign
+                </button>
+
+            </div>
 
         </form>
 
     </div>
 
 
-    <!-- =====================================================
-         CAMPAIGN LIST
-         ===================================================== -->
+    <!-- ===================================================== -->
+    <!-- CAMPAIGNS LIST -->
+    <!-- ===================================================== -->
 
     <div class="card">
 
@@ -594,6 +760,10 @@
                         </th>
 
                         <th>
+                            Attachment
+                        </th>
+
+                        <th>
                             Status
                         </th>
 
@@ -608,233 +778,65 @@
 
                 <tbody>
 
-                {% for row in rows %}
+                    {% for row in rows %}
 
-                    <tr>
+                        <tr>
 
-                        <!-- =====================================
-                             CAMPAIGN NAME
-                             ===================================== -->
+                            <!-- ================================= -->
+                            <!-- NAME -->
+                            <!-- ================================= -->
 
-                        <td>
+                            <td>
 
-                            <strong>
-                                {{ row.name }}
-                            </strong>
+                                <strong>
+                                    {{ row.name }}
+                                </strong>
 
-                        </td>
+                                {% if row.created_at %}
 
+                                    <div class="hint">
+                                        {{ row.created_at }}
+                                    </div>
 
-                        <!-- =====================================
-                             TARGET
-                             ===================================== -->
+                                {% endif %}
 
-                        <td>
+                            </td>
 
-                            {% if row.group_name
-                                  and row.group_name.startswith('__SINGLE__:') %}
 
-                                {% set single_phone =
-                                    row.group_name.replace('__SINGLE__:', '', 1)
-                                %}
+                            <!-- ================================= -->
+                            <!-- TARGET -->
+                            <!-- ================================= -->
 
-                                <span>
-                                    📱 {{ single_phone }}
-                                </span>
+                            <td>
 
-                            {% else %}
+                                {% if row.target_type == "single" %}
 
-                                <span>
-                                    👥 {{ row.group_name or 'No Group' }}
-                                </span>
+                                    📱
+                                    {{ row.target_phone }}
 
-                            {% endif %}
+                                {% elif row.group_name and row.group_name.startswith("__SINGLE__:") %}
 
-                        </td>
+                                    📱
+                                    {{ row.group_name.replace("__SINGLE__:", "") }}
 
+                                {% else %}
 
-                        <!-- =====================================
-                             MESSAGE
-                             ===================================== -->
+                                    👥
+                                    {{ row.group_name or "—" }}
 
-                        <td>
+                                {% endif %}
 
-                            <div
-                                class="message-preview"
-                                title="{{ row.message }}"
-                            >
-                                {{ row.message }}
-                            </div>
+                            </td>
 
-                        </td>
 
+                            <!-- ================================= -->
+                            <!-- MESSAGE -->
+                            <!-- ================================= -->
 
-                        <!-- =====================================
-                             STATUS
-                             ===================================== -->
+                            <td>
 
-                        <td>
+                                <div class="message-preview">
 
-                            {% set status =
-                                (row.status or 'Draft')|lower
-                            %}
+                                    {% if row.message %}
 
-                            {% if status == 'accepted' %}
-
-                                <span
-                                    class="status status-accepted"
-                                >
-                                    Accepted
-                                </span>
-
-                            {% elif status == 'partial' %}
-
-                                <span
-                                    class="status status-partial"
-                                >
-                                    Partial
-                                </span>
-
-                            {% elif status == 'failed' %}
-
-                                <span
-                                    class="status status-failed"
-                                >
-                                    Failed
-                                </span>
-
-                            {% else %}
-
-                                <span
-                                    class="status status-draft"
-                                >
-                                    Draft
-                                </span>
-
-                            {% endif %}
-
-                        </td>
-
-
-                        <!-- =====================================
-                             ACTION
-                             ===================================== -->
-
-                        <td>
-
-                            <div class="action-box">
-
-
-                                <!-- =================================
-                                     SEND FORM
-                                     IMPORTANT:
-                                     This is a completely separate form.
-                                     ================================= -->
-
-                                <form
-                                    method="post"
-                                    action="{{ url_for('send_campaign', cid=row.id) }}"
-                                    onsubmit="return confirmSendCampaign();"
-                                >
-
-                                    <button
-                                        type="submit"
-                                        class="btn btn-success"
-                                    >
-                                        📤 Send
-                                    </button>
-
-                                </form>
-
-
-                                <!-- =================================
-                                     DELETE FORM
-                                     IMPORTANT:
-                                     This is NOT inside Send form.
-                                     ================================= -->
-
-                                <form
-                                    method="post"
-                                    action="{{ url_for('delete_campaign', cid=row.id) }}"
-                                    onsubmit="return confirmDeleteCampaign();"
-                                >
-
-                                    <button
-                                        type="submit"
-                                        class="btn btn-danger"
-                                    >
-                                        🗑 Delete
-                                    </button>
-
-                                </form>
-
-
-                            </div>
-
-                        </td>
-
-                    </tr>
-
-                {% else %}
-
-                    <tr>
-
-                        <td
-                            colspan="5"
-                            class="empty"
-                        >
-                            No campaigns found.
-                        </td>
-
-                    </tr>
-
-                {% endfor %}
-
-                </tbody>
-
-            </table>
-
-        </div>
-
-    </div>
-
-</div>
-
-
-<!-- =========================================================
-     JAVASCRIPT
-     ========================================================= -->
-
-<script>
-
-    /*
-     * Change Campaign Type
-     *
-     * Single Number:
-     * Show contact selector.
-     *
-     * Group:
-     * Show group selector.
-     */
-
-    function changeCampaignType() {
-
-        const singleType =
-            document.getElementById(
-                "type_single"
-            );
-
-        const groupType =
-            document.getElementById(
-                "type_group"
-            );
-
-        const singleBox =
-            document.getElementById(
-                "singleContactBox"
-            );
-
-        const groupBox =
-            document.getElementById(
-                "groupBox"
-   
+  
