@@ -1,183 +1,223 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Deepak's CRM</title>
+    <meta charset="UTF-8">
 
-<style>
-body{
-    margin:0;
-    font-family:Arial;
-    background:#f5f7fb;
-    color:#172033
-}
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
 
-.nav{
-    background:#123a63;
-    color:#fff;
-    padding:18px 24px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center
-}
+    <title>
+        {% block title %}
+        Deepak's CRM
+        {% endblock %}
+    </title>
 
-.brand{
-    font-size:22px;
-    font-weight:700
-}
+    <style>
+        * {
+            box-sizing: border-box;
+        }
 
-.nav a{
-    color:#fff;
-    text-decoration:none;
-    margin-left:18px
-}
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f5f7fb;
+            color: #222;
+        }
 
-.nav a:hover{
-    text-decoration:underline
-}
+        .navbar {
+            width: 100%;
+            background: #ffffff;
+            border-bottom: 1px solid #ddd;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
 
-.wrap{
-    max-width:1100px;
-    margin:28px auto;
-    padding:0 18px
-}
+        .nav-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 14px 20px;
 
-.cards,
-.grid{
-    display:grid;
-    grid-template-columns:repeat(3,1fr);
-    gap:18px
-}
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+        }
 
-.grid{
-    grid-template-columns:1fr 1fr
-}
+        .brand {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1479d1;
+            text-decoration: none;
+            white-space: nowrap;
+        }
 
-.card,
-.panel{
-    background:#fff;
-    border-radius:14px;
-    padding:22px;
-    box-shadow:0 3px 14px #0001
-}
+        .nav-links {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
 
-.num{
-    font-size:32px;
-    font-weight:700
-}
+        .nav-links a {
+            display: inline-block;
+            padding: 9px 13px;
 
-.btn{
-    background:#1769aa;
-    color:white;
-    border:0;
-    padding:10px 16px;
-    border-radius:8px;
-    cursor:pointer
-}
+            text-decoration: none;
+            color: #333;
 
-.table{
-    width:100%;
-    border-collapse:collapse
-}
+            border-radius: 7px;
 
-.table th,
-.table td{
-    padding:11px;
-    border-bottom:1px solid #e8ebf0;
-    text-align:left
-}
+            font-size: 14px;
+            font-weight: 600;
 
-.form input,
-.form textarea,
-.form select{
-    width:100%;
-    box-sizing:border-box;
-    padding:11px;
-    margin:6px 0 14px;
-    border:1px solid #ccd3dd;
-    border-radius:8px
-}
+            transition: 0.2s ease;
+        }
 
-.form textarea{
-    min-height:130px
-}
+        .nav-links a:hover {
+            background: #eaf4ff;
+            color: #1479d1;
+        }
 
-.flash{
-    background:#e9f5ff;
-    padding:12px;
-    border-radius:8px;
-    margin-bottom:16px
-}
+        .wrap {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 25px 20px;
+        }
 
-.muted{
-    color:#697586
-}
+        .flash {
+            margin-bottom: 15px;
+            padding: 12px 15px;
 
-@media(max-width:700px){
+            background: #e8f7ee;
+            color: #176b36;
 
-    .cards,
-    .grid{
-        grid-template-columns:1fr
-    }
+            border: 1px solid #b8e5c7;
+            border-radius: 7px;
 
-    .nav{
-        display:block
-    }
+            font-size: 14px;
+        }
 
-    .nav a{
-        display:inline-block;
-        margin:10px 10px 0 0
-    }
-}
-</style>
+        button,
+        input,
+        select,
+        textarea {
+            font-family: inherit;
+        }
+
+        @media (max-width: 768px) {
+
+            .nav-inner {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .brand {
+                text-align: center;
+            }
+
+            .nav-links {
+                justify-content: center;
+            }
+
+            .nav-links a {
+                font-size: 13px;
+                padding: 8px 10px;
+            }
+
+            .wrap {
+                padding: 18px 12px;
+            }
+        }
+    </style>
+
+    {% block head %}
+    {% endblock %}
 </head>
 
 <body>
 
-<div class="nav">
+    <!-- =====================================================
+         NAVIGATION
+         ===================================================== -->
 
-    <div class="brand">
-        📱 Deepak's CRM
-    </div>
+    <div class="navbar">
 
-    <div>
+        <div class="nav-inner">
 
-        <a href="/">Dashboard</a>
+            <!-- BRAND -->
+            <a class="brand"
+               href="{{ url_for('dashboard') }}">
+                Deepak's CRM
+            </a>
 
-        <a href="/contacts">Contacts</a>
+            <!-- MENU -->
+            <div class="nav-links">
 
-        <a href="/campaigns">Campaigns</a>
+                <a href="{{ url_for('dashboard') }}">
+                    Dashboard
+                </a>
 
-        <a href="/messages">Messages</a>
+                <a href="{{ url_for('contacts') }}">
+                    Contacts
+                </a>
 
-        <a href="/incoming">Incoming</a>
+                <a href="{{ url_for('campaigns') }}">
+                    Campaigns
+                </a>
 
-        <a href="/settings">Settings</a>
+                <a href="{{ url_for('incoming') }}">
+                    Incoming
+                </a>
 
-    </div>
+                <a href="{{ url_for('google_drive') }}">
+                    Google Drive
+                </a>
 
-</div>
+                <a href="{{ url_for('settings') }}">
+                    Settings
+                </a>
 
-<div class="wrap">
+            </div>
 
-{% with messages=get_flashed_messages() %}
-
-    {% for m in messages %}
-
-        <div class="flash">
-            {{m}}
         </div>
 
-    {% endfor %}
+    </div>
 
-{% endwith %}
 
-{% block content %}
+    <!-- =====================================================
+         MAIN CONTENT
+         ===================================================== -->
 
-{% endblock %}
+    <div class="wrap">
 
-</div>
+        <!-- FLASH MESSAGES -->
+
+        {% with messages = get_flashed_messages() %}
+
+            {% if messages %}
+
+                {% for m in messages %}
+
+                    <div class="flash">
+                        {{ m }}
+                    </div>
+
+                {% endfor %}
+
+            {% endif %}
+
+        {% endwith %}
+
+
+        <!-- PAGE CONTENT -->
+
+        {% block content %}
+
+        {% endblock %}
+
+    </div>
+
 
 </body>
 </html>
