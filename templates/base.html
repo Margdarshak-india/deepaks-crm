@@ -2,222 +2,93 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
-
-    <title>
-        {% block title %}
-        Deepak's CRM
-        {% endblock %}
-    </title>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Deepak's CRM{% endblock %}</title>
     <style>
-        * {
-            box-sizing: border-box;
-        }
-
+        * { box-sizing: border-box; }
         body {
             margin: 0;
-            padding: 0;
             font-family: Arial, Helvetica, sans-serif;
-            background: #f5f7fb;
+            background: #f4f7fb;
             color: #222;
         }
-
         .navbar {
-            width: 100%;
-            background: #ffffff;
-            border-bottom: 1px solid #ddd;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        }
-
-        .nav-inner {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 14px 20px;
-
+            background: #168bc4;
+            color: #fff;
+            padding: 14px 4%;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 20px;
+            gap: 15px;
+            flex-wrap: wrap;
         }
-
         .brand {
-            font-size: 22px;
-            font-weight: 700;
-            color: #1479d1;
+            font-size: 21px;
+            font-weight: bold;
             text-decoration: none;
-            white-space: nowrap;
+            color: #fff;
         }
-
         .nav-links {
             display: flex;
-            align-items: center;
-            flex-wrap: wrap;
             gap: 8px;
+            flex-wrap: wrap;
         }
-
         .nav-links a {
-            display: inline-block;
-            padding: 9px 13px;
-
+            color: #fff;
             text-decoration: none;
-            color: #333;
-
+            padding: 8px 11px;
             border-radius: 7px;
-
-            font-size: 14px;
-            font-weight: 600;
-
-            transition: 0.2s ease;
         }
-
-        .nav-links a:hover {
-            background: #eaf4ff;
-            color: #1479d1;
-        }
-
+        .nav-links a:hover { background: rgba(255,255,255,.16); }
         .wrap {
-            width: 100%;
+            width: 94%;
             max-width: 1200px;
-            margin: 0 auto;
-            padding: 25px 20px;
+            margin: 25px auto;
         }
-
         .flash {
-            margin-bottom: 15px;
             padding: 12px 15px;
-
-            background: #e8f7ee;
-            color: #176b36;
-
-            border: 1px solid #b8e5c7;
-            border-radius: 7px;
-
-            font-size: 14px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            background: #e9f7ff;
+            color: #0879ad;
+            border: 1px solid #c8eafa;
         }
-
-        button,
-        input,
-        select,
-        textarea {
-            font-family: inherit;
-        }
-
-        @media (max-width: 768px) {
-
-            .nav-inner {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .brand {
-                text-align: center;
-            }
-
-            .nav-links {
-                justify-content: center;
-            }
-
-            .nav-links a {
-                font-size: 13px;
-                padding: 8px 10px;
-            }
-
-            .wrap {
-                padding: 18px 12px;
-            }
+        @media (max-width: 700px) {
+            .navbar { padding: 12px 3%; }
+            .nav-links { width: 100%; }
+            .nav-links a { flex: 1; text-align: center; }
+            .wrap { width: 96%; margin: 15px auto; }
         }
     </style>
-
-    {% block head %}
-    {% endblock %}
+    {% block head %}{% endblock %}
 </head>
-
 <body>
 
-    <!-- =====================================================
-         NAVIGATION
-         ===================================================== -->
+<div class="navbar">
+    <a class="brand" href="{{ url_for('dashboard') }}">Deepak's CRM</a>
 
-    <div class="navbar">
-
-        <div class="nav-inner">
-
-            <!-- BRAND -->
-            <a class="brand"
-               href="{{ url_for('dashboard') }}">
-                Deepak's CRM
-            </a>
-
-            <!-- MENU -->
-            <div class="nav-links">
-
-                <a href="{{ url_for('dashboard') }}">
-                    Dashboard
-                </a>
-
-                <a href="{{ url_for('contacts') }}">
-                    Contacts
-                </a>
-
-                <a href="{{ url_for('campaigns') }}">
-                    Campaigns
-                </a>
-
-                <a href="{{ url_for('incoming') }}">
-                    Incoming
-                </a>
-
-                <a href="{{ url_for('google_drive') }}">
-                    Google Drive
-                </a>
-
-                <a href="{{ url_for('settings') }}">
-                    Settings
-                </a>
-
-            </div>
-
-        </div>
-
+    <div class="nav-links">
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('contacts') }}">Contacts</a>
+        <a href="{{ url_for('campaigns') }}">Campaigns</a>
+        <a href="{{ url_for('google_drive') }}">Google Drive</a>
+        <a href="{{ url_for('incoming') }}">Incoming</a>
+        <a href="{{ url_for('settings') }}">Settings</a>
     </div>
+</div>
 
+<div class="wrap">
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for m in messages %}
+                <div class="flash">{{ m }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 
-    <!-- =====================================================
-         MAIN CONTENT
-         ===================================================== -->
+    {% block content %}{% endblock %}
+</div>
 
-    <div class="wrap">
-
-        <!-- FLASH MESSAGES -->
-
-        {% with messages = get_flashed_messages() %}
-
-            {% if messages %}
-
-                {% for m in messages %}
-
-                    <div class="flash">
-                        {{ m }}
-                    </div>
-
-                {% endfor %}
-
-            {% endif %}
-
-        {% endwith %}
-
-
-        <!-- PAGE CONTENT -->
-
-        {% block content %}
-
-        {% endblock %}
-
-    </div>
-
-
+{% block scripts %}{% endblock %}
 </body>
 </html>
