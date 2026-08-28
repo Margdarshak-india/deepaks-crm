@@ -849,6 +849,12 @@ def google_drive_import(file_id):
 
     return redirect(url_for("google_drive"))
 
+# =========================================================
+# GOOGLE CAMPAIGNS ALIAS
+# =========================================================
+@app.route("/google/campaigns", methods=["GET", "POST"])
+def google_campaigns():
+    return campaigns()
 
 # =========================================================
 # CAMPAIGNS
