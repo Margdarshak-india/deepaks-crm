@@ -3288,3 +3288,77 @@ if __name__ == "__main__":
         port=port,
         debug=False
     )
+
+# ============================================================
+# WHATSAPP TEMPLATE DEBUG
+# ============================================================
+
+@app.route("/debug/templates")
+def debug_templates():
+
+    import os
+    import requests
+
+    access_token = os.getenv("WHATSAPP_ACCESS_TOKEN")
+    waba_id = os.getenv("WHATSAPP_BUSINESS_ACCOUNT_ID")
+
+    if not access_token:
+        return jsonify({
+            "status": "error",
+            "message": "WHATSAPP_ACCESS_TOKEN is not configured"
+        }), 500
+
+    if not waba_id:
+        return jsonify({
+            "status": "error",
+            "message": "WHATSAPP_BUSINESS_ACCOUNT_ID is not configured"
+        }), 500
+
+    url = f"https://graph.facebook.com/v23.0/{waba_id}/message_templates"
+
+    params = {
+        "fields": "name,language,status,category",
+        "limit": 100
+    }
+
+    headers = {
+        "Authorization": f"Bearer {access_token}"
+    }
+
+    try:
+        response = requests.get(
+            url,
+            headers=headers,
+            params=params,
+            timeout=30
+        )
+
+        data = response.json()
+
+        if response.status_code != 200:
+            return jsonify({
+                "status": "error",
+                "http_status": response.status_code,
+                "meta_response": data
+            }), response.status_code
+
+        templates = []
+
+        for item in data.get("data", []):
+            templates.append({
+                "name": item.get("name"),
+                "language": item.get("language"),
+                "status": item.get("status"),
+                "category": item.get("category")
+            })
+
+        return jsonify({
+            "status": "ok",
+            "templates": templates
+        })
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
