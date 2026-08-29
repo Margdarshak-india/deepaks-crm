@@ -23,6 +23,7 @@ import json
 import secrets
 
 from datetime import datetime
+from urllib.parse import urlencode
 
 
 # =========================================================
@@ -108,7 +109,10 @@ def init_db():
 
         c = db()
 
-        # Contacts
+        # -------------------------------------------------
+        # CONTACTS
+        # -------------------------------------------------
+
         c.execute("""
             CREATE TABLE IF NOT EXISTS contacts(
                 id SERIAL PRIMARY KEY,
@@ -118,7 +122,10 @@ def init_db():
             )
         """)
 
-        # Campaigns
+        # -------------------------------------------------
+        # CAMPAIGNS
+        # -------------------------------------------------
+
         c.execute("""
             CREATE TABLE IF NOT EXISTS campaigns(
                 id SERIAL PRIMARY KEY,
@@ -130,7 +137,10 @@ def init_db():
             )
         """)
 
-        # WhatsApp messages
+        # -------------------------------------------------
+        # WHATSAPP MESSAGES
+        # -------------------------------------------------
+
         c.execute("""
             CREATE TABLE IF NOT EXISTS whatsapp_messages(
                 id SERIAL PRIMARY KEY,
@@ -147,7 +157,10 @@ def init_db():
             )
         """)
 
-        # Incoming WhatsApp messages
+        # -------------------------------------------------
+        # INCOMING MESSAGES
+        # -------------------------------------------------
+
         c.execute("""
             CREATE TABLE IF NOT EXISTS whatsapp_incoming(
                 id SERIAL PRIMARY KEY,
@@ -159,7 +172,10 @@ def init_db():
             )
         """)
 
-        # Webhook events
+        # -------------------------------------------------
+        # WEBHOOK EVENTS
+        # -------------------------------------------------
+
         c.execute("""
             CREATE TABLE IF NOT EXISTS webhook_events(
                 id SERIAL PRIMARY KEY,
@@ -221,9 +237,7 @@ def whatsapp_configured():
 # GOOGLE DRIVE OAUTH CONFIGURATION
 # =========================================================
 
-GOOGLE_CLIENT_ID = get_env(
-    "GOOGLE_CLIENT_ID"
-)
+GOOGLE_CLIENT_ID = get_env("GOOGLE_CLIENT_ID")
 
 GOOGLE_CLIENT_SECRET = get_env(
     "GOOGLE_CLIENT_SECRET"
@@ -351,10 +365,11 @@ def whatsapp_messages_url():
     )
 
 
-def send_whatsapp_text(
-    phone,
-    body
-):
+# =========================================================
+# SEND WHATSAPP TEXT
+# =========================================================
+
+def send_whatsapp_text(phone, body):
 
     token = get_env(
         "WHATSAPP_ACCESS_TOKEN"
@@ -452,7 +467,7 @@ def send_whatsapp_text(
 
 
 # =========================================================
-# WHATSAPP TEMPLATE API
+# SEND WHATSAPP TEMPLATE
 # =========================================================
 
 def send_whatsapp_template(
@@ -664,20 +679,27 @@ def drive_files_list():
 
         "pageSize": 100,
 
-        "orderBy":
-            "modifiedTime desc",
+        "orderBy": "modifiedTime desc",
 
-        "fields":
-            "files(id,name,mimeType,size,"
-            "modifiedTime,webViewLink)",
+        "fields": (
+            "files("
+            "id,"
+            "name,"
+            "mimeType,"
+            "size,"
+            "modifiedTime,"
+            "webViewLink"
+            ")"
+        ),
 
-        "q":
+        "q": (
             "trashed = false and "
             "("
             "mimeType = 'text/csv' or "
             "mimeType = "
             "'application/vnd.google-apps.spreadsheet'"
             ")"
+        )
     }
 
     return drive_request(
@@ -709,8 +731,8 @@ def download_drive_file(
         ):
 
             url = (
-                f"{GOOGLE_DRIVE_API}/files/"
-                f"{file_id}/export"
+                f"{GOOGLE_DRIVE_API}/"
+                f"files/{file_id}/export"
             )
 
             params = {
@@ -720,8 +742,8 @@ def download_drive_file(
         else:
 
             url = (
-                f"{GOOGLE_DRIVE_API}/files/"
-                f"{file_id}"
+                f"{GOOGLE_DRIVE_API}/"
+                f"files/{file_id}"
             )
 
             params = {
@@ -840,13 +862,12 @@ def import_csv_text(text):
 
             try:
 
-                result = c.execute(
+                c.execute(
                     """
                     INSERT INTO contacts
                     (name, phone, group_name)
                     VALUES (?, ?, ?)
-                    ON CONFLICT (phone)
-                    DO NOTHING
+                    ON CONFLICT (phone) DO NOTHING
                     """,
                     (
                         name,
@@ -855,31 +876,30 @@ def import_csv_text(text):
                     )
                 )
 
-                if result.rowcount > 0:
-                    added += 1
-                else:
-                    skipped += 1
+                c.commit()
+
+                added += 1
 
             except Exception:
 
                 c.rollback()
+
                 skipped += 1
 
-        c.commit()
+        return (
+            added,
+            f"{skipped} rows skipped."
+        )
 
     except Exception:
 
         c.rollback()
+
         raise
 
     finally:
 
         c.close()
-
-    return (
-        added,
-        f"{skipped} rows skipped."
-    )
 
 
 # =========================================================
@@ -909,12 +929,8 @@ def dashboard():
         """
         SELECT COUNT(*) AS n
         FROM whatsapp_messages
-        WHERE status IN (
-            'sent',
-            'delivered',
-            'read',
-            'accepted'
-        )
+        WHERE status IN
+        ('sent','delivered','read','accepted')
         """
     ).fetchone()["n"]
 
@@ -996,7 +1012,7 @@ def contacts():
         if not f:
 
             flash(
-                "Please select a CSV file."
+                "CSV file select करें."
             )
 
             return redirect(
@@ -1080,10 +1096,13 @@ def delete_selected_contacts():
         for contact_id in contact_ids:
 
             try:
+
                 contact_id = int(
                     contact_id
                 )
+
             except ValueError:
+
                 continue
 
             result = c.execute(
@@ -1283,18 +1302,17 @@ def google_login():
     if not google_configured():
 
         flash(
-            "Google OAuth is not configured. "
-            "Add GOOGLE_CLIENT_ID and "
-            "GOOGLE_CLIENT_SECRET in Render."
+            "Google OAuth configure नहीं है. "
+            "GOOGLE_CLIENT_ID और "
+            "GOOGLE_CLIENT_SECRET "
+            "Render में add करें."
         )
 
         return redirect(
             url_for("google_drive")
         )
 
-    state = secrets.token_urlsafe(
-        32
-    )
+    state = secrets.token_urlsafe(32)
 
     session[
         "google_oauth_state"
@@ -1302,32 +1320,22 @@ def google_login():
 
     params = {
 
-        "client_id":
-            GOOGLE_CLIENT_ID,
+        "client_id": GOOGLE_CLIENT_ID,
 
-        "redirect_uri":
-            GOOGLE_REDIRECT_URI,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
 
-        "response_type":
-            "code",
+        "response_type": "code",
 
-        "scope":
-            GOOGLE_OAUTH_SCOPE,
+        "scope": GOOGLE_OAUTH_SCOPE,
 
-        "access_type":
-            "offline",
+        "access_type": "offline",
 
-        "prompt":
-            "consent",
+        "prompt": "consent",
 
-        "include_granted_scopes":
-            "true",
+        "include_granted_scopes": "true",
 
-        "state":
-            state
+        "state": state
     }
-
-    from urllib.parse import urlencode
 
     return redirect(
         GOOGLE_AUTH_URL
@@ -1395,20 +1403,15 @@ def google_oauth_callback():
 
     token_payload = {
 
-        "code":
-            code,
+        "code": code,
 
-        "client_id":
-            GOOGLE_CLIENT_ID,
+        "client_id": GOOGLE_CLIENT_ID,
 
-        "client_secret":
-            GOOGLE_CLIENT_SECRET,
+        "client_secret": GOOGLE_CLIENT_SECRET,
 
-        "redirect_uri":
-            GOOGLE_REDIRECT_URI,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
 
-        "grant_type":
-            "authorization_code"
+        "grant_type": "authorization_code"
     }
 
     try:
@@ -1426,18 +1429,15 @@ def google_oauth_callback():
 
         if not r.ok:
 
-            return jsonify({
-
-                "status":
-                    "error",
-
-                "message":
-                    "Google token exchange failed",
-
-                "details":
-                    data
-
-            }), 400
+            return jsonify(
+                {
+                    "status": "error",
+                    "message": (
+                        "Google token exchange failed"
+                    ),
+                    "details": data
+                }
+            ), 400
 
         session[
             "google_access_token"
@@ -1465,15 +1465,12 @@ def google_oauth_callback():
 
     except Exception as e:
 
-        return jsonify({
-
-            "status":
-                "error",
-
-            "message":
-                str(e)
-
-        }), 500
+        return jsonify(
+            {
+                "status": "error",
+                "message": str(e)
+            }
+        ), 500
 
 
 # =========================================================
@@ -1515,7 +1512,7 @@ def google_drive_import(file_id):
     if not google_token():
 
         flash(
-            "Please connect Google Drive first."
+            "पहले Google Drive connect करें."
         )
 
         return redirect(
@@ -1554,8 +1551,8 @@ def google_drive_import(file_id):
         )
 
         flash(
-            f"{added} contacts imported from "
-            f"Google Drive. {extra}"
+            f"Google Drive से {added} "
+            f"contacts import हुए. {extra}"
         )
 
     except Exception as e:
@@ -1592,6 +1589,10 @@ def google_campaigns():
 )
 def campaigns():
 
+    # =====================================================
+    # CREATE CAMPAIGN
+    # =====================================================
+
     if request.method == "POST":
 
         name = request.form.get(
@@ -1614,15 +1615,29 @@ def campaigns():
             ""
         ).strip()
 
-        manual_number = request.form.get(
-            "manual_number",
-            ""
+        target_mode = request.form.get(
+            "target_mode",
+            "saved"
         ).strip()
 
-        if not name or not message:
+        # -------------------------------------------------
+        # BASIC VALIDATION
+        # -------------------------------------------------
+
+        if not name:
 
             flash(
-                "Campaign name and message are required."
+                "Campaign name is required."
+            )
+
+            return redirect(
+                url_for("campaigns")
+            )
+
+        if not message:
+
+            flash(
+                "Message is required."
             )
 
             return redirect(
@@ -1633,19 +1648,79 @@ def campaigns():
         # SINGLE NUMBER CAMPAIGN
         # =================================================
 
-        if (
-            campaign_type == "Single Number"
-            and manual_number
-        ):
+        if campaign_type == "single":
 
-            manual_number = clean_phone(
-                manual_number
-            )
+            # ---------------------------------------------
+            # MANUAL NUMBER
+            # ---------------------------------------------
 
-            group_name = (
-                "__SINGLE__:"
-                + manual_number
-            )
+            if target_mode == "manual":
+
+                manual_number = clean_phone(
+                    request.form.get(
+                        "manual_number",
+                        ""
+                    ).strip()
+                )
+
+                if not manual_number:
+
+                    flash(
+                        "Please enter a WhatsApp number."
+                    )
+
+                    return redirect(
+                        url_for("campaigns")
+                    )
+
+                group_name = (
+                    "__SINGLE__:"
+                    + manual_number
+                )
+
+            # ---------------------------------------------
+            # SAVED CONTACT
+            # ---------------------------------------------
+
+            else:
+
+                single_number = clean_phone(
+                    request.form.get(
+                        "single_number",
+                        ""
+                    ).strip()
+                )
+
+                if not single_number:
+
+                    flash(
+                        "Please select a saved contact."
+                    )
+
+                    return redirect(
+                        url_for("campaigns")
+                    )
+
+                group_name = (
+                    "__SINGLE__:"
+                    + single_number
+                )
+
+        # =================================================
+        # GROUP CAMPAIGN
+        # =================================================
+
+        else:
+
+            if not group_name:
+
+                flash(
+                    "Please select a contact group."
+                )
+
+                return redirect(
+                    url_for("campaigns")
+                )
 
         # =================================================
         # SAVE CAMPAIGN
@@ -1658,37 +1733,46 @@ def campaigns():
             c.execute(
                 """
                 INSERT INTO campaigns
-                (name, message, group_name)
-                VALUES (?, ?, ?)
+                (
+                    name,
+                    message,
+                    group_name,
+                    status
+                )
+                VALUES (?, ?, ?, ?)
                 """,
                 (
                     name,
                     message,
-                    group_name
+                    group_name,
+                    "Draft"
                 )
             )
 
             c.commit()
 
-        except Exception:
+            flash(
+                "Campaign saved as Draft."
+            )
+
+        except Exception as e:
 
             c.rollback()
-            raise
+
+            flash(
+                f"Campaign save error: {e}"
+            )
 
         finally:
 
             c.close()
-
-        flash(
-            "Campaign saved as Draft."
-        )
 
         return redirect(
             url_for("campaigns")
         )
 
     # =====================================================
-    # GET CAMPAIGNS
+    # CAMPAIGN LIST
     # =====================================================
 
     c = db()
@@ -1701,24 +1785,74 @@ def campaigns():
         """
     ).fetchall()
 
+    # =====================================================
+    # GROUPS
+    # =====================================================
+
     groups = [
+
         r["group_name"]
+
         for r in c.execute(
             """
             SELECT DISTINCT group_name
             FROM contacts
             WHERE group_name IS NOT NULL
+            AND group_name != ''
             ORDER BY group_name
             """
         ).fetchall()
+
     ]
+
+    # =====================================================
+    # CONTACTS
+    # =====================================================
+
+    contact_rows = c.execute(
+        """
+        SELECT *
+        FROM contacts
+        ORDER BY name ASC
+        """
+    ).fetchall()
 
     c.close()
 
+    # =====================================================
+    # GOOGLE DRIVE FILES
+    # =====================================================
+
+    drive_files = []
+    drive_error = None
+
+    if google_token():
+
+        data, drive_error = drive_files_list()
+
+        if isinstance(data, dict):
+
+            drive_files = data.get(
+                "files",
+                []
+            )
+
     return render_template(
         "campaigns.html",
+
         rows=rows,
-        groups=groups
+
+        groups=groups,
+
+        contacts=contact_rows,
+
+        google_connected=bool(
+            google_token()
+        ),
+
+        drive_files=drive_files,
+
+        drive_error=drive_error
     )
 
 
@@ -1732,8 +1866,9 @@ def campaigns():
 )
 def send_campaign(cid):
 
-    # GET request should simply return
-    # to campaigns page.
+    # -----------------------------------------------------
+    # GET REQUEST
+    # -----------------------------------------------------
 
     if request.method == "GET":
 
@@ -1746,14 +1881,14 @@ def send_campaign(cid):
     try:
 
         # =================================================
-        # FIND CAMPAIGN
+        # GET CAMPAIGN
         # =================================================
 
         campaign = c.execute(
             """
             SELECT *
             FROM campaigns
-            WHERE id=?
+            WHERE id = ?
             """,
             (cid,)
         ).fetchone()
@@ -1769,7 +1904,7 @@ def send_campaign(cid):
             )
 
         # =================================================
-        # CHECK WHATSAPP API
+        # WHATSAPP CONFIG CHECK
         # =================================================
 
         if not whatsapp_configured():
@@ -1777,10 +1912,13 @@ def send_campaign(cid):
             c.execute(
                 """
                 UPDATE campaigns
-                SET status='API Not Configured'
-                WHERE id=?
+                SET status = ?
+                WHERE id = ?
                 """,
-                (cid,)
+                (
+                    "API Not Configured",
+                    cid
+                )
             )
 
             c.commit()
@@ -1804,7 +1942,7 @@ def send_campaign(cid):
         group_value = (
             campaign["group_name"]
             or ""
-        )
+        ).strip()
 
         # =================================================
         # SINGLE NUMBER CAMPAIGN
@@ -1815,21 +1953,29 @@ def send_campaign(cid):
         ):
 
             manual_number = (
-                group_value.replace(
+                group_value
+                .replace(
                     "__SINGLE__:",
                     "",
                     1
-                ).strip()
+                )
+                .strip()
+            )
+
+            manual_number = clean_phone(
+                manual_number
             )
 
             if manual_number:
 
                 contacts_list = [
+
                     {
                         "id": None,
                         "name": "Customer",
                         "phone": manual_number
                     }
+
                 ]
 
         # =================================================
@@ -1848,7 +1994,7 @@ def send_campaign(cid):
             if group_value:
 
                 q += """
-                    WHERE group_name=?
+                    WHERE group_name = ?
                 """
 
                 params = (
@@ -1861,7 +2007,7 @@ def send_campaign(cid):
             ).fetchall()
 
         # =================================================
-        # NO RECIPIENTS
+        # NO RECIPIENT
         # =================================================
 
         if not contacts_list:
@@ -1869,16 +2015,19 @@ def send_campaign(cid):
             c.execute(
                 """
                 UPDATE campaigns
-                SET status='No Recipients'
-                WHERE id=?
+                SET status = ?
+                WHERE id = ?
                 """,
-                (cid,)
+                (
+                    "No Recipients",
+                    cid
+                )
             )
 
             c.commit()
 
             flash(
-                "No recipients found for this campaign."
+                "No valid recipient found."
             )
 
             return redirect(
@@ -1886,7 +2035,7 @@ def send_campaign(cid):
             )
 
         # =================================================
-        # SEND MESSAGES
+        # SEND LOOP
         # =================================================
 
         sent = 0
@@ -1894,11 +2043,17 @@ def send_campaign(cid):
 
         for contact in contacts_list:
 
+            contact_name = (
+                contact["name"]
+                or
+                "Customer"
+            )
+
             body = (
                 campaign["message"]
                 .replace(
                     "{{name}}",
-                    contact["name"]
+                    contact_name
                 )
             )
 
@@ -1906,15 +2061,27 @@ def send_campaign(cid):
                 contact["phone"]
             )
 
-            ok, message_id, response = (
-                send_whatsapp_text(
-                    phone,
-                    body
+            # ------------------------------------------------
+            # INVALID PHONE
+            # ------------------------------------------------
+
+            if not phone:
+
+                ok = False
+                message_id = None
+                response = "Invalid phone number"
+
+            else:
+
+                ok, message_id, response = (
+                    send_whatsapp_text(
+                        phone,
+                        body
+                    )
                 )
-            )
 
             # =================================================
-            # MESSAGE STATUS
+            # RESULT
             # =================================================
 
             if ok:
@@ -1948,7 +2115,7 @@ def send_campaign(cid):
                     )
 
             # =================================================
-            # SAVE MESSAGE
+            # SAVE MESSAGE LOG
             # =================================================
 
             try:
@@ -1997,17 +2164,35 @@ def send_campaign(cid):
                     failed += 1
 
         # =================================================
-        # UPDATE CAMPAIGN STATUS
+        # CAMPAIGN STATUS
         # =================================================
+
+        if sent > 0 and failed == 0:
+
+            campaign_status = (
+                f"Accepted {sent}, Failed {failed}"
+            )
+
+        elif sent > 0 and failed > 0:
+
+            campaign_status = (
+                f"Accepted {sent}, Failed {failed}"
+            )
+
+        else:
+
+            campaign_status = (
+                f"Accepted {sent}, Failed {failed}"
+            )
 
         c.execute(
             """
             UPDATE campaigns
-            SET status=?
-            WHERE id=?
+            SET status = ?
+            WHERE id = ?
             """,
             (
-                f"Accepted {sent}, Failed {failed}",
+                campaign_status,
                 cid
             )
         )
@@ -2124,10 +2309,7 @@ def webhook_receive():
 
         if not data:
 
-            return (
-                "OK",
-                200
-            )
+            return "OK", 200
 
         c = db()
 
@@ -2138,7 +2320,10 @@ def webhook_receive():
         c.execute(
             """
             INSERT INTO webhook_events
-            (event_type, payload)
+            (
+                event_type,
+                payload
+            )
             VALUES (?, ?)
             """,
             (
@@ -2149,6 +2334,10 @@ def webhook_receive():
                 )
             )
         )
+
+        # =================================================
+        # ENTRY
+        # =================================================
 
         entries = data.get(
             "entry",
@@ -2170,7 +2359,7 @@ def webhook_receive():
                 )
 
                 # =================================================
-                # MESSAGE STATUS UPDATES
+                # MESSAGE STATUS
                 # =================================================
 
                 statuses = value.get(
@@ -2207,10 +2396,11 @@ def webhook_receive():
                             """
                             UPDATE whatsapp_messages
                             SET
-                                status=?,
-                                error=?,
-                                updated_at=CURRENT_TIMESTAMP
-                            WHERE wa_message_id=?
+                                status = ?,
+                                error = ?,
+                                updated_at =
+                                    CURRENT_TIMESTAMP
+                            WHERE wa_message_id = ?
                             """,
                             (
                                 new_status,
@@ -2244,7 +2434,10 @@ def webhook_receive():
 
                     message_text = ""
 
-                    # Text
+                    # ------------------------------------------------
+                    # TEXT
+                    # ------------------------------------------------
+
                     if msg_type == "text":
 
                         message_text = (
@@ -2257,7 +2450,10 @@ def webhook_receive():
                             )
                         )
 
-                    # Button
+                    # ------------------------------------------------
+                    # BUTTON
+                    # ------------------------------------------------
+
                     elif msg_type == "button":
 
                         message_text = (
@@ -2270,7 +2466,10 @@ def webhook_receive():
                             )
                         )
 
-                    # Interactive
+                    # ------------------------------------------------
+                    # INTERACTIVE
+                    # ------------------------------------------------
+
                     elif msg_type == "interactive":
 
                         interactive = msg.get(
@@ -2279,7 +2478,9 @@ def webhook_receive():
                         )
 
                         if (
-                            interactive.get("type")
+                            interactive.get(
+                                "type"
+                            )
                             ==
                             "button_reply"
                         ):
@@ -2297,7 +2498,9 @@ def webhook_receive():
                             )
 
                         elif (
-                            interactive.get("type")
+                            interactive.get(
+                                "type"
+                            )
                             ==
                             "list_reply"
                         ):
@@ -2315,7 +2518,7 @@ def webhook_receive():
                             )
 
                     # =================================================
-                    # SAVE INCOMING MESSAGE
+                    # SAVE INCOMING
                     # =================================================
 
                     if wa_message_id:
@@ -2324,7 +2527,8 @@ def webhook_receive():
 
                             c.execute(
                                 """
-                                INSERT INTO whatsapp_incoming
+                                INSERT INTO
+                                whatsapp_incoming
                                 (
                                     wa_message_id,
                                     phone,
@@ -2345,8 +2549,13 @@ def webhook_receive():
 
                             c.rollback()
 
+                            # Re-open transaction
+                            c.execute(
+                                "SELECT 1"
+                            )
+
                     # =================================================
-                    # ADD SENDER TO CONTACTS
+                    # AUTO SAVE CONTACT
                     # =================================================
 
                     if sender:
@@ -2359,7 +2568,7 @@ def webhook_receive():
                             """
                             SELECT id
                             FROM contacts
-                            WHERE phone=?
+                            WHERE phone = ?
                             """,
                             (
                                 cleaned_sender,
@@ -2441,6 +2650,7 @@ def webhook_receive():
             except Exception:
                 pass
 
+        # WhatsApp webhook should receive 200
         return (
             "EVENT_RECEIVED",
             200
@@ -2457,7 +2667,7 @@ def webhook_receive():
 
 
 # =========================================================
-# MESSAGE ROUTES
+# MESSAGE TEST ROUTE
 # =========================================================
 
 @app.route("/messages-test")
@@ -2468,6 +2678,10 @@ def messages_test():
         "message": "MESSAGES ROUTING WORKING"
     }
 
+
+# =========================================================
+# MESSAGES
+# =========================================================
 
 @app.route("/messages")
 def messages():
@@ -2496,58 +2710,29 @@ def messages():
 
 
 # =========================================================
-# INCOMING MESSAGES
+# INCOMING
 # =========================================================
 
-@app.route(
-    "/incoming",
-    methods=["GET"]
-)
+@app.route("/incoming")
 def incoming():
 
-    c = None
+    c = db()
 
-    try:
+    rows = c.execute(
+        """
+        SELECT *
+        FROM whatsapp_incoming
+        ORDER BY id DESC
+        LIMIT 500
+        """
+    ).fetchall()
 
-        c = db()
+    c.close()
 
-        rows = c.execute(
-            """
-            SELECT *
-            FROM whatsapp_incoming
-            ORDER BY id DESC
-            LIMIT 500
-            """
-        ).fetchall()
-
-        return render_template(
-            "incoming.html",
-            rows=rows
-        )
-
-    except Exception as e:
-
-        print(
-            "INCOMING PAGE ERROR:",
-            str(e)
-        )
-
-        flash(
-            f"Incoming messages error: {str(e)}"
-        )
-
-        return redirect(
-            url_for("dashboard")
-        )
-
-    finally:
-
-        if c:
-
-            try:
-                c.close()
-            except Exception:
-                pass
+    return render_template(
+        "incoming.html",
+        rows=rows
+    )
 
 
 # =========================================================
@@ -2611,33 +2796,29 @@ def settings():
     return render_template(
         "settings.html",
 
-        config_ok=
-            whatsapp_configured(),
+        config_ok=whatsapp_configured(),
 
-        webhook_token_ok=
-            bool(
-                get_env(
-                    "WEBHOOK_VERIFY_TOKEN"
-                )
-            ),
+        webhook_token_ok=bool(
+            get_env(
+                "WEBHOOK_VERIFY_TOKEN"
+            )
+        ),
 
-        app_secret_ok=
-            bool(
-                get_env(
-                    "META_APP_SECRET"
-                )
-            ),
+        app_secret_ok=bool(
+            get_env(
+                "META_APP_SECRET"
+            )
+        ),
 
-        google_configured=
-            google_configured(),
+        google_configured=google_configured(),
 
-        google_connected=
-            bool(
-                google_token()
-            ),
+        google_connected=bool(
+            google_token()
+        ),
 
-        google_redirect_uri=
+        google_redirect_uri=(
             GOOGLE_REDIRECT_URI
+        )
     )
 
 
@@ -2650,57 +2831,58 @@ def settings():
 )
 def whatsapp_status():
 
-    return jsonify({
+    return jsonify(
+        {
+            "configured":
+                whatsapp_configured(),
 
-        "configured":
-            whatsapp_configured(),
+            "phone_number_id":
+                bool(
+                    get_env(
+                        "WHATSAPP_PHONE_NUMBER_ID"
+                    )
+                ),
 
-        "phone_number_id":
-            bool(
-                get_env(
-                    "WHATSAPP_PHONE_NUMBER_ID"
-                )
-            ),
+            "access_token":
+                bool(
+                    get_env(
+                        "WHATSAPP_ACCESS_TOKEN"
+                    )
+                ),
 
-        "access_token":
-            bool(
-                get_env(
-                    "WHATSAPP_ACCESS_TOKEN"
-                )
-            ),
+            "app_secret":
+                bool(
+                    get_env(
+                        "META_APP_SECRET"
+                    )
+                ),
 
-        "app_secret":
-            bool(
-                get_env(
-                    "META_APP_SECRET"
-                )
-            ),
+            "webhook_verify_token":
+                bool(
+                    get_env(
+                        "WEBHOOK_VERIFY_TOKEN"
+                    )
+                ),
 
-        "webhook_verify_token":
-            bool(
-                get_env(
-                    "WEBHOOK_VERIFY_TOKEN"
-                )
-            ),
+            "database_configured":
+                bool(
+                    get_env(
+                        "DATABASE_URL"
+                    )
+                ),
 
-        "database_configured":
-            bool(
-                get_env(
-                    "DATABASE_URL"
-                )
-            ),
+            "google_configured":
+                google_configured(),
 
-        "google_configured":
-            google_configured(),
+            "google_connected":
+                bool(
+                    google_token()
+                ),
 
-        "google_connected":
-            bool(
-                google_token()
-            ),
-
-        "google_redirect_uri":
-            GOOGLE_REDIRECT_URI
-    })
+            "google_redirect_uri":
+                GOOGLE_REDIRECT_URI
+        }
+    )
 
 
 # =========================================================
@@ -2711,7 +2893,6 @@ def whatsapp_status():
 def health():
 
     database_ok = False
-
     database_error = None
 
     try:
@@ -2735,38 +2916,38 @@ def health():
             database_error
         )
 
-    return jsonify({
+    return jsonify(
+        {
+            "status": "ok",
 
-        "status":
-            "ok",
+            "database_configured":
+                bool(
+                    get_env(
+                        "DATABASE_URL"
+                    )
+                ),
 
-        "database_configured":
-            bool(
-                get_env(
-                    "DATABASE_URL"
-                )
-            ),
+            "database_connected":
+                database_ok,
 
-        "database_connected":
-            database_ok,
+            "whatsapp_configured":
+                whatsapp_configured(),
 
-        "whatsapp_configured":
-            whatsapp_configured(),
+            "google_configured":
+                google_configured(),
 
-        "google_configured":
-            google_configured(),
+            "google_connected":
+                bool(
+                    google_token()
+                ),
 
-        "google_connected":
-            bool(
-                google_token()
-            ),
+            "time":
+                datetime.utcnow().isoformat(),
 
-        "time":
-            datetime.utcnow().isoformat(),
-
-        "database_error":
-            database_error
-    })
+            "database_error":
+                database_error
+        }
+    )
 
 
 # =========================================================
@@ -2776,21 +2957,20 @@ def health():
 @app.route("/debug/routes")
 def debug_routes():
 
-    return jsonify([
-        {
-            "rule":
-                str(rule),
+    return jsonify(
+        [
+            {
+                "rule": str(rule),
+                "endpoint": rule.endpoint,
+                "methods": sorted(
+                    rule.methods
+                )
+            }
 
-            "endpoint":
-                rule.endpoint,
-
-            "methods":
-                sorted(rule.methods)
-        }
-
-        for rule
-        in app.url_map.iter_rules()
-    ])
+            for rule
+            in app.url_map.iter_rules()
+        ]
+    )
 
 
 @app.route("/debug/test")
@@ -2819,7 +2999,7 @@ def delete_campaign(cid):
         result = c.execute(
             """
             DELETE FROM campaigns
-            WHERE id=?
+            WHERE id = ?
             """,
             (cid,)
         )
@@ -2856,7 +3036,7 @@ def delete_campaign(cid):
 
 
 # =========================================================
-# RUN APPLICATION
+# RUN
 # =========================================================
 
 if __name__ == "__main__":
