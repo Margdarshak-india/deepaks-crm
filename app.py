@@ -2166,11 +2166,11 @@ def send_campaign(cid):
 
             else:
 
-                ok, message_id, response = (
-                    send_whatsapp_text(
-                        phone,
-                        body
-                    )
+                ok, message_id, response = send_whatsapp_with_policy(
+    phone,
+    body,
+    contact.get("name") or "Customer"
+)
                 )
 
             # =================================================
