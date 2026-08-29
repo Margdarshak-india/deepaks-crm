@@ -2171,7 +2171,6 @@ def send_campaign(cid):
     body,
     contact.get("name") or "Customer"
 )
-                )
 
             # =================================================
             # RESULT
