@@ -1023,7 +1023,7 @@ def campaigns():
         if not name or not message:
             flash("Campaign name and message are required.")
             return redirect(url_for("campaigns"))
-            if campaign_type == "Single Number" and manual_number:
+        if campaign_type == "Single Number" and manual_number:
             group_name = "__SINGLE__:" + manual_number
 
         c = db()
