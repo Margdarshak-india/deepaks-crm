@@ -1066,8 +1066,13 @@ def campaigns():
 # SEND CAMPAIGN
 # =========================================================
 
-@app.route("/campaign/<int:cid>/send", methods=["POST"])
+@app.route("/campaign/<int:cid>/send", methods=["GET", "POST"])
 def send_campaign(cid):
+    def send_campaign(cid):
+
+    if request.method == "GET":
+        return redirect(url_for("campaigns"))
+        
     c = db()
 
     try:
