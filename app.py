@@ -1016,10 +1016,15 @@ def campaigns():
         name = request.form.get("name", "").strip()
         message = request.form.get("message", "").strip()
         group_name = request.form.get("group_name", "").strip()
+        campaign_type = request.form.get("campaign_type", "").strip()
+manual_number = request.form.get("manual_number", "").strip()
+
 
         if not name or not message:
-            flash("Campaign name और message जरूरी है.")
+            flash("Campaign name and message are required.")
             return redirect(url_for("campaigns"))
+            if campaign_type == "Single Number" and manual_number:
+    group_name = "__SINGLE__:" + manual_number
 
         c = db()
 
@@ -1094,21 +1099,51 @@ def send_campaign(cid):
 
             c.commit()
 
-            flash(
-                "WHATSAPP_ACCESS_TOKEN और "
-                "WHATSAPP_PHONE_NUMBER_ID configure करें."
+            flash(        
+                "Please configure WHATSAPP_ACCESS_TOKEN and "
+                "WHATSAPP_PHONE_NUMBER_ID."
             )
 
             return redirect(url_for("campaigns"))
 
-        q = "SELECT * FROM contacts"
-        params = ()
+        # =========================================================
+# BUILD RECIPIENT LIST
+# =========================================================
 
-        if campaign["group_name"]:
-            q += " WHERE group_name=?"
-            params = (campaign["group_name"],)
+contacts_list = []
 
-        contacts_list = c.execute(q, params).fetchall()
+group_value = campaign["group_name"] or ""
+
+# Single Number campaign
+if group_value.startswith("__SINGLE__:"):
+
+    manual_number = group_value.replace(
+        "__SINGLE__:",
+        "",
+        1
+    ).strip()
+
+    if manual_number:
+        contacts_list = [{
+            "id": None,
+            "name": "Customer",
+            "phone": manual_number
+        }]
+
+# Group campaign
+else:
+
+    q = "SELECT * FROM contacts"
+    params = ()
+
+    if group_value:
+        q += " WHERE group_name=?"
+        params = (group_value,)
+
+    contacts_list = c.execute(
+        q,
+        params
+    ).fetchall()
 
         sent = 0
         failed = 0
