@@ -643,27 +643,34 @@ def dashboard():
 def google_contacts():
     return redirect(url_for("contacts"))
 
+
 # =========================================================
 # CONTACTS
 # =========================================================
 
 @app.route("/contacts", methods=["GET", "POST"])
 def contacts():
+
     if request.method == "POST":
+
         f = request.files.get("file")
 
         if not f:
             flash("CSV file select करें.")
             return redirect(url_for("contacts"))
 
-        text = f.read().decode(
-            "utf-8-sig",
-            errors="ignore"
-        )
+        try:
+            text = f.read().decode(
+                "utf-8-sig",
+                errors="ignore"
+            )
 
-        added, extra = import_csv_text(text)
+            added, extra = import_csv_text(text)
 
-        flash(f"{added} contacts imported. {extra}")
+            flash(f"{added} contacts imported. {extra}")
+
+        except Exception as e:
+            flash(f"Import error: {e}")
 
         return redirect(url_for("contacts"))
 
@@ -682,6 +689,142 @@ def contacts():
         rows=rows
     )
 
+# =========================================================
+# DELETE SELECTED CONTACTS
+# =========================================================
+
+@app.route("/contacts/delete-selected", methods=["POST"])
+def delete_selected_contacts():
+
+    contact_ids = request.form.getlist("contact_ids")
+
+    if not contact_ids:
+        flash("Please select at least one contact.")
+        return redirect(url_for("contacts"))
+
+    c = db()
+
+    deleted = 0
+
+    try:
+
+        for contact_id in contact_ids:
+
+            try:
+                contact_id = int(contact_id)
+            except ValueError:
+                continue
+
+            result = c.execute(
+                """
+                DELETE FROM contacts
+                WHERE id = ?
+                """,
+                (contact_id,)
+            )
+
+            deleted += result.rowcount
+
+        c.commit()
+
+        flash(
+            f"{deleted} contact(s) deleted successfully."
+        )
+
+    except Exception as e:
+
+        c.rollback()
+
+        flash(
+            f"Delete error: {e}"
+        )
+
+    finally:
+
+        c.close()
+
+    return redirect(url_for("contacts"))
+
+
+# =========================================================
+# DELETE SINGLE CONTACT
+# =========================================================
+
+@app.route("/contacts/delete/<int:contact_id>", methods=["POST"])
+def delete_contact(contact_id):
+
+    c = db()
+
+    try:
+
+        result = c.execute(
+            """
+            DELETE FROM contacts
+            WHERE id = ?
+            """,
+            (contact_id,)
+        )
+
+        c.commit()
+
+        if result.rowcount > 0:
+            flash("Contact deleted successfully.")
+        else:
+            flash("Contact not found.")
+
+    except Exception as e:
+
+        c.rollback()
+
+        flash(
+            f"Delete error: {e}"
+        )
+
+    finally:
+
+        c.close()
+
+    return redirect(url_for("contacts"))
+
+
+# =========================================================
+# DELETE ALL CONTACTS
+# =========================================================
+
+@app.route("/contacts/delete-all", methods=["POST"])
+def delete_all_contacts():
+
+    c = db()
+
+    try:
+
+        result = c.execute(
+            """
+            DELETE FROM contacts
+            """
+        )
+
+        deleted = result.rowcount
+
+        c.commit()
+
+        flash(
+            f"{deleted} contact(s) deleted successfully."
+        )
+
+    except Exception as e:
+
+        c.rollback()
+
+        flash(
+            f"Delete all error: {e}"
+        )
+
+    finally:
+
+        c.close()
+
+    return redirect(url_for("contacts"))
 
 # =========================================================
 # GOOGLE DRIVE
