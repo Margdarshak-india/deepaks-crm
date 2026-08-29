@@ -1640,3 +1640,37 @@ if __name__ == "__main__":
         port=port,
         debug=False
     )
+
+# =========================================================
+# DELETE CAMPAIGN
+# =========================================================
+
+@app.route("/campaign/<int:cid>/delete", methods=["POST"])
+def delete_campaign(cid):
+
+    c = db()
+
+    try:
+        result = c.execute(
+            """
+            DELETE FROM campaigns
+            WHERE id = ?
+            """,
+            (cid,)
+        )
+
+        c.commit()
+
+        if result.rowcount > 0:
+            flash("Campaign deleted successfully.")
+        else:
+            flash("Campaign not found.")
+
+    except Exception as e:
+        c.rollback()
+        flash(f"Delete campaign error: {e}")
+
+    finally:
+        c.close()
+
+    return redirect(url_for("campaigns"))
