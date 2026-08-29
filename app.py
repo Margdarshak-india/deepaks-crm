@@ -1017,14 +1017,14 @@ def campaigns():
         message = request.form.get("message", "").strip()
         group_name = request.form.get("group_name", "").strip()
         campaign_type = request.form.get("campaign_type", "").strip()
-manual_number = request.form.get("manual_number", "").strip()
+        manual_number = request.form.get("manual_number", "").strip()
 
 
         if not name or not message:
             flash("Campaign name and message are required.")
             return redirect(url_for("campaigns"))
             if campaign_type == "Single Number" and manual_number:
-    group_name = "__SINGLE__:" + manual_number
+            group_name = "__SINGLE__:" + manual_number
 
         c = db()
 
@@ -1032,7 +1032,7 @@ manual_number = request.form.get("manual_number", "").strip()
             INSERT INTO campaigns
             (name, message, group_name)
             VALUES (?, ?, ?)
-        """, (name, message, group_name))
+            """, (name, message, group_name))
 
         c.commit()
         c.close()
