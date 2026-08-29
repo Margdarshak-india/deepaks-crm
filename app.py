@@ -635,6 +635,13 @@ def dashboard():
         recent=recent
     )
 
+# =========================================================
+# GOOGLE CONTACTS ALIAS
+# =========================================================
+
+@app.route("/google/contacts")
+def google_contacts():
+    return redirect(url_for("contacts"))
 
 # =========================================================
 # CONTACTS
