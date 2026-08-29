@@ -364,6 +364,99 @@ def whatsapp_messages_url():
         f"{phone_id}/messages"
     )
 
+# =========================================================
+# WHATSAPP 24-HOUR WINDOW
+# =========================================================
+
+def get_last_incoming_message(phone):
+    phone = clean_phone(phone)
+
+    if not phone:
+        return None
+
+    c = db()
+
+    try:
+        row = c.execute("""
+            SELECT created_at
+            FROM whatsapp_incoming
+            WHERE phone = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (phone,)).fetchone()
+
+        return row["created_at"] if row else None
+
+    finally:
+        c.close()
+
+
+def within_whatsapp_24_hours(phone):
+    last_message = get_last_incoming_message(phone)
+
+    if not last_message:
+        return False
+
+    now = datetime.utcnow()
+
+    # PostgreSQL timestamp may be naive UTC
+    if hasattr(last_message, "tzinfo") and last_message.tzinfo:
+        last_message = last_message.replace(tzinfo=None)
+
+    hours = (now - last_message).total_seconds() / 3600
+
+    return hours <= 24
+
+# =========================================================
+# SEND MESSAGE WITH 24-HOUR POLICY
+# =========================================================
+
+def send_whatsapp_with_policy(phone, body, contact_name="Customer"):
+
+    phone = clean_phone(phone)
+
+    if not phone:
+        return False, None, "Invalid phone number"
+
+    # -----------------------------------------------------
+    # CUSTOMER MESSAGED US WITHIN LAST 24 HOURS
+    # -----------------------------------------------------
+
+    if within_whatsapp_24_hours(phone):
+
+        return send_whatsapp_text(
+            phone,
+            body
+        )
+
+    # -----------------------------------------------------
+    # OUTSIDE 24-HOUR WINDOW
+    # USE APPROVED TEMPLATE
+    # -----------------------------------------------------
+
+    template_name = get_env(
+        "WHATSAPP_FALLBACK_TEMPLATE_NAME"
+    )
+
+    template_language = get_env(
+        "WHATSAPP_FALLBACK_TEMPLATE_LANGUAGE"
+    ) or "en_US"
+
+    if not template_name:
+
+        return (
+            False,
+            None,
+            "24-hour window expired. "
+            "WHATSAPP_FALLBACK_TEMPLATE_NAME is not configured."
+        )
+
+    return send_whatsapp_template(
+        phone,
+        template_name,
+        template_language,
+        [contact_name]
+    )
 
 # =========================================================
 # SEND WHATSAPP TEXT
