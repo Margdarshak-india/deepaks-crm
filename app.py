@@ -1953,78 +1953,49 @@ def campaigns():
 # SEND CAMPAIGN
 # =========================================================
 
-@app.route(
-    "/campaign/<int:cid>/send",
-    methods=["GET", "POST"]
-)
+@app.route("/campaign/<int:cid>/send", methods=["GET", "POST"])
 def send_campaign(cid):
 
-    # -----------------------------------------------------
-    # GET REQUEST
-    # -----------------------------------------------------
-
     if request.method == "GET":
-
-        return redirect(
-            url_for("campaigns")
-        )
+        return redirect(url_for("campaigns"))
 
     c = db()
 
     try:
-
-        # =================================================
+        # -------------------------------------------------
         # GET CAMPAIGN
-        # =================================================
+        # -------------------------------------------------
 
-        campaign = c.execute(
-            """
+        campaign = c.execute("""
             SELECT *
             FROM campaigns
             WHERE id = ?
-            """,
-            (cid,)
-        ).fetchone()
+        """, (cid,)).fetchone()
 
         if not campaign:
+            flash("Campaign not found.")
+            return redirect(url_for("campaigns"))
 
-            flash(
-                "Campaign not found."
-            )
-
-            return redirect(
-                url_for("campaigns")
-            )
-
-        # =================================================
-        # WHATSAPP CONFIG CHECK
-        # =================================================
+        # -------------------------------------------------
+        # CHECK WHATSAPP CONFIG
+        # -------------------------------------------------
 
         if not whatsapp_configured():
 
-            c.execute(
-                """
+            c.execute("""
                 UPDATE campaigns
-                SET status = ?
+                SET status = 'API Not Configured'
                 WHERE id = ?
-                """,
-                (
-                    "API Not Configured",
-                    cid
-                )
-            )
+            """, (cid,))
 
             c.commit()
 
             flash(
-                "Please configure "
-                "WHATSAPP_ACCESS_TOKEN and "
-                "WHATSAPP_PHONE_NUMBER_ID."
+                "Please configure WHATSAPP_ACCESS_TOKEN "
+                "and WHATSAPP_PHONE_NUMBER_ID."
             )
 
-            return redirect(
-                url_for("campaigns")
-            )
+            return redirect(url_for("campaigns"))
 
         # =================================================
         # BUILD RECIPIENT LIST
@@ -2032,48 +2003,33 @@ def send_campaign(cid):
 
         contacts_list = []
 
-        group_value = (
-            campaign["group_name"]
-            or ""
-        ).strip()
+        group_value = campaign["group_name"] or ""
 
-        # =================================================
+        # -------------------------------------------------
         # SINGLE NUMBER CAMPAIGN
-        # =================================================
+        # -------------------------------------------------
 
-        if group_value.startswith(
-            "__SINGLE__:"
-        ):
+        if group_value.startswith("__SINGLE__:"):
 
-            manual_number = (
-                group_value
-                .replace(
-                    "__SINGLE__:",
-                    "",
-                    1
-                )
-                .strip()
-            )
+            manual_number = group_value.replace(
+                "__SINGLE__:",
+                "",
+                1
+            ).strip()
 
-            manual_number = clean_phone(
-                manual_number
-            )
+            manual_number = clean_phone(manual_number)
 
             if manual_number:
 
-                contacts_list = [
+                contacts_list = [{
+                    "id": None,
+                    "name": "Customer",
+                    "phone": manual_number
+                }]
 
-                    {
-                        "id": None,
-                        "name": "Customer",
-                        "phone": manual_number
-                    }
-
-                ]
-
-        # =================================================
+        # -------------------------------------------------
         # GROUP CAMPAIGN
-        # =================================================
+        # -------------------------------------------------
 
         else:
 
@@ -2090,42 +2046,47 @@ def send_campaign(cid):
                     WHERE group_name = ?
                 """
 
-                params = (
-                    group_value,
-                )
+                params = (group_value,)
+
+            q += """
+                ORDER BY id ASC
+            """
 
             contacts_list = c.execute(
                 q,
                 params
             ).fetchall()
 
-        # =================================================
-        # NO RECIPIENT
-        # =================================================
+        # -------------------------------------------------
+        # NO RECIPIENTS
+        # -------------------------------------------------
 
         if not contacts_list:
 
-            c.execute(
-                """
+            c.execute("""
                 UPDATE campaigns
-                SET status = ?
+                SET status = 'No Recipients'
                 WHERE id = ?
-                """,
-                (
-                    "No Recipients",
-                    cid
-                )
-            )
+            """, (cid,))
 
             c.commit()
 
-            flash(
-                "No valid recipient found."
-            )
+            flash("No recipients found for this campaign.")
 
-            return redirect(
-                url_for("campaigns")
-            )
+            return redirect(url_for("campaigns"))
+
+        # =================================================
+        # TEMPLATE CONFIGURATION
+        # =================================================
+
+        template_name = get_env(
+            "WHATSAPP_TEMPLATE_NAME"
+        )
+
+        template_language = (
+            get_env("WHATSAPP_TEMPLATE_LANGUAGE")
+            or "en_US"
+        )
 
         # =================================================
         # SEND LOOP
@@ -2133,168 +2094,351 @@ def send_campaign(cid):
 
         sent = 0
         failed = 0
+        text_sent = 0
+        template_sent = 0
 
         for contact in contacts_list:
 
-            contact_name = (
-                contact["name"]
-                or
-                "Customer"
-            )
+            try:
 
-            body = (
-                campaign["message"]
-                .replace(
-                    "{{name}}",
-                    contact_name
+                # -------------------------------------------------
+                # CONTACT DETAILS
+                # -------------------------------------------------
+
+                contact_id = contact.get("id")
+
+                contact_name = (
+                    contact.get("name")
+                    or "Customer"
                 )
-            )
 
-            phone = clean_phone(
-                contact["phone"]
-            )
+                phone = clean_phone(
+                    contact.get("phone")
+                    or ""
+                )
 
-            # ------------------------------------------------
-            # INVALID PHONE
-            # ------------------------------------------------
+                if not phone:
 
-            if not phone:
+                    failed += 1
 
-                ok = False
-                message_id = None
-                response = "Invalid phone number"
+                    try:
+                        c.execute("""
+                            INSERT INTO whatsapp_messages
+                            (
+                                campaign_id,
+                                contact_id,
+                                phone,
+                                message,
+                                wa_message_id,
+                                direction,
+                                status,
+                                error
+                            )
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            cid,
+                            contact_id,
+                            "",
+                            campaign["message"],
+                            None,
+                            "outgoing",
+                            "failed",
+                            "Invalid phone number"
+                        ))
 
-            else:
+                        c.commit()
 
-                ok, message_id, response = send_whatsapp_with_policy(
-    phone,
-    body,
-    contact.get("name") or "Customer"
-)
+                    except Exception:
+                        c.rollback()
 
-            # =================================================
-            # RESULT
-            # =================================================
+                    continue
 
-            if ok:
+                # -------------------------------------------------
+                # PERSONALIZED MESSAGE
+                # -------------------------------------------------
 
-                status = "accepted"
-
-                sent += 1
-
-                error_text = None
-
-            else:
-
-                status = "failed"
-
-                failed += 1
-
-                if isinstance(
-                    response,
-                    (dict, list)
-                ):
-
-                    error_text = json.dumps(
-                        response,
-                        ensure_ascii=False
+                body = (
+                    campaign["message"]
+                    .replace(
+                        "{{name}}",
+                        str(contact_name)
                     )
+                )
+
+                # =================================================
+                # CHECK 24-HOUR CUSTOMER WINDOW
+                # =================================================
+
+                latest_incoming = c.execute("""
+                    SELECT created_at
+                    FROM whatsapp_incoming
+                    WHERE phone = ?
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """, (phone,)).fetchone()
+
+                within_24_hours = False
+
+                if latest_incoming:
+
+                    incoming_time = (
+                        latest_incoming["created_at"]
+                    )
+
+                    if incoming_time:
+
+                        try:
+
+                            age_seconds = (
+                                datetime.utcnow()
+                                - incoming_time
+                            ).total_seconds()
+
+                            if (
+                                age_seconds >= 0
+                                and age_seconds <= 86400
+                            ):
+                                within_24_hours = True
+
+                        except Exception as time_error:
+
+                            print(
+                                "24 HOUR CHECK ERROR:",
+                                str(time_error)
+                            )
+
+                # =================================================
+                # SEND NORMAL TEXT
+                # =================================================
+
+                if within_24_hours:
+
+                    ok, message_id, response = (
+                        send_whatsapp_text(
+                            phone,
+                            body
+                        )
+                    )
+
+                    send_type = "text"
+
+                    if ok:
+
+                        status = "accepted"
+                        sent += 1
+                        text_sent += 1
+                        error_text = None
+
+                    else:
+
+                        status = "failed"
+                        failed += 1
+
+                        if isinstance(
+                            response,
+                            (dict, list)
+                        ):
+
+                            error_text = json.dumps(
+                                response,
+                                ensure_ascii=False
+                            )
+
+                        else:
+
+                            error_text = str(response)
+
+                # =================================================
+                # OUTSIDE 24 HOURS
+                # USE APPROVED TEMPLATE
+                # =================================================
 
                 else:
 
-                    error_text = str(
-                        response
-                    )
+                    send_type = "template"
 
-            # =================================================
-            # SAVE MESSAGE LOG
-            # =================================================
+                    if not template_name:
 
-            try:
+                        ok = False
+                        message_id = None
 
-                c.execute(
-                    """
-                    INSERT INTO whatsapp_messages
-                    (
-                        campaign_id,
-                        contact_id,
-                        phone,
-                        message,
-                        wa_message_id,
-                        direction,
-                        status,
-                        error
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
+                        error_text = (
+                            "Outside 24-hour window. "
+                            "WHATSAPP_TEMPLATE_NAME is not "
+                            "configured in Render Environment."
+                        )
+
+                        failed += 1
+                        status = "failed"
+
+                    else:
+
+                        # -----------------------------------------
+                        # TEMPLATE PARAMETERS
+                        #
+                        # This sends contact name as {{1}}
+                        # if your approved template has a
+                        # body variable.
+                        # -----------------------------------------
+
+                        template_parameters = [
+                            contact_name
+                        ]
+
+                        ok, message_id, response = (
+                            send_whatsapp_template(
+                                phone,
+                                template_name,
+                                template_language,
+                                template_parameters
+                            )
+                        )
+
+                        if ok:
+
+                            status = "accepted"
+                            sent += 1
+                            template_sent += 1
+                            error_text = None
+
+                        else:
+
+                            status = "failed"
+                            failed += 1
+
+                            if isinstance(
+                                response,
+                                (dict, list)
+                            ):
+
+                                error_text = json.dumps(
+                                    response,
+                                    ensure_ascii=False
+                                )
+
+                            else:
+
+                                error_text = str(response)
+
+                # =================================================
+                # SAVE MESSAGE
+                # =================================================
+
+                try:
+
+                    c.execute("""
+                        INSERT INTO whatsapp_messages
+                        (
+                            campaign_id,
+                            contact_id,
+                            phone,
+                            message,
+                            wa_message_id,
+                            direction,
+                            status,
+                            error
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
                         cid,
-                        contact["id"],
+                        contact_id,
                         phone,
                         body,
                         message_id,
                         "outgoing",
                         status,
                         error_text
+                    ))
+
+                    c.commit()
+
+                except Exception as db_error:
+
+                    print(
+                        "MESSAGE DATABASE ERROR:",
+                        str(db_error)
                     )
-                )
 
-                c.commit()
+                    c.rollback()
 
-            except Exception as db_error:
+                    if ok:
+
+                        sent -= 1
+                        failed += 1
+
+            except Exception as contact_error:
 
                 print(
-                    "MESSAGE DATABASE ERROR:",
-                    str(db_error)
+                    "CONTACT SEND ERROR:",
+                    str(contact_error)
                 )
 
-                c.rollback()
+                failed += 1
 
-                if ok:
+                try:
 
-                    sent -= 1
-                    failed += 1
+                    c.rollback()
+
+                    c.execute("""
+                        INSERT INTO whatsapp_messages
+                        (
+                            campaign_id,
+                            contact_id,
+                            phone,
+                            message,
+                            wa_message_id,
+                            direction,
+                            status,
+                            error
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        cid,
+                        contact.get("id"),
+                        clean_phone(
+                            contact.get("phone")
+                            or ""
+                        ),
+                        campaign["message"],
+                        None,
+                        "outgoing",
+                        "failed",
+                        str(contact_error)
+                    ))
+
+                    c.commit()
+
+                except Exception:
+                    c.rollback()
 
         # =================================================
-        # CAMPAIGN STATUS
+        # FINAL CAMPAIGN STATUS
         # =================================================
 
-        if sent > 0 and failed == 0:
-
-            campaign_status = (
-                f"Accepted {sent}, Failed {failed}"
-            )
-
-        elif sent > 0 and failed > 0:
-
-            campaign_status = (
-                f"Accepted {sent}, Failed {failed}"
-            )
-
-        else:
-
-            campaign_status = (
-                f"Accepted {sent}, Failed {failed}"
-            )
-
-        c.execute(
-            """
+        c.execute("""
             UPDATE campaigns
             SET status = ?
             WHERE id = ?
-            """,
+        """, (
             (
-                campaign_status,
-                cid
-            )
-        )
+                f"Accepted {sent}, "
+                f"Failed {failed}"
+            ),
+            cid
+        ))
 
         c.commit()
+
+        # =================================================
+        # RESULT MESSAGE
+        # =================================================
 
         flash(
             f"Campaign finished: "
             f"{sent} accepted, "
-            f"{failed} failed."
+            f"{failed} failed. "
+            f"Text: {text_sent}, "
+            f"Template: {template_sent}"
         )
 
         return redirect(
@@ -2327,7 +2471,6 @@ def send_campaign(cid):
             c.close()
         except Exception:
             pass
-
 
 # =========================================================
 # WEBHOOK VERIFY
