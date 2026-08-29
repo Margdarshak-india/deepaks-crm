@@ -1106,29 +1106,29 @@ def send_campaign(cid):
 
             return redirect(url_for("campaigns"))
 
+ # =========================================================
+        # BUILD RECIPIENT LIST
         # =========================================================
-# BUILD RECIPIENT LIST
-# =========================================================
 
-contacts_list = []
+        contacts_list = []
 
-group_value = campaign["group_name"] or ""
+        group_value = campaign["group_name"] or ""
 
-# Single Number campaign
-if group_value.startswith("__SINGLE__:"):
+        # Single Number campaign
+        if group_value.startswith("__SINGLE__:"):
 
-    manual_number = group_value.replace(
-        "__SINGLE__:",
-        "",
-        1
-    ).strip()
+            manual_number = group_value.replace(
+                "__SINGLE__:",
+                "",
+                1
+            ).strip()
 
-    if manual_number:
-        contacts_list = [{
-            "id": None,
-            "name": "Customer",
-            "phone": manual_number
-        }]
+            if manual_number:
+                contacts_list = [{
+                    "id": None,
+                    "name": "Customer",
+                    "phone": manual_number
+                }]
 
 # Group campaign
 else:
