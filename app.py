@@ -133,9 +133,17 @@ def init_db():
                 message TEXT NOT NULL,
                 group_name TEXT,
                 status TEXT DEFAULT 'Draft',
+                drive_file_id TEXT,
+                drive_file_name TEXT,
+                drive_mime_type TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        # Existing installations: add attachment columns safely.
+        c.execute("ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS drive_file_id TEXT")
+        c.execute("ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS drive_file_name TEXT")
+        c.execute("ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS drive_mime_type TEXT")
 
         # -------------------------------------------------
         # WHATSAPP MESSAGES
@@ -785,13 +793,12 @@ def drive_files_list():
             ")"
         ),
 
+        # Return all non-trashed files (not folders).
+        # CSV/Google Sheets can be imported as contacts; other
+        # supported files can be selected as campaign attachments.
         "q": (
             "trashed = false and "
-            "("
-            "mimeType = 'text/csv' or "
-            "mimeType = "
-            "'application/vnd.google-apps.spreadsheet'"
-            ")"
+            "mimeType != 'application/vnd.google-apps.folder'"
         )
     }
 
@@ -1713,6 +1720,11 @@ def campaigns():
             "saved"
         ).strip()
 
+        # Optional Google Drive attachment selected on the form.
+        drive_file_id = request.form.get("drive_file_id", "").strip()
+        drive_file_name = request.form.get("drive_file_name", "").strip()
+        drive_mime_type = request.form.get("drive_mime_type", "").strip()
+
         # -------------------------------------------------
         # BASIC VALIDATION
         # -------------------------------------------------
@@ -1830,15 +1842,21 @@ def campaigns():
                     name,
                     message,
                     group_name,
-                    status
+                    status,
+                    drive_file_id,
+                    drive_file_name,
+                    drive_mime_type
                 )
-                VALUES (?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     name,
                     message,
                     group_name,
-                    "Draft"
+                    "Draft",
+                    drive_file_id or None,
+                    drive_file_name or None,
+                    drive_mime_type or None
                 )
             )
 
@@ -3270,25 +3288,6 @@ def delete_campaign(cid):
     )
 
 
-# =========================================================
-# RUN
-# =========================================================
-
-if __name__ == "__main__":
-
-    port = int(
-        os.getenv(
-            "PORT",
-            "10000"
-        )
-    )
-
-    app.run(
-        host="0.0.0.0",
-        port=port,
-        debug=False
-    )
-
 # ============================================================
 # WHATSAPP TEMPLATE DEBUG
 # ============================================================
@@ -3362,3 +3361,24 @@ def debug_templates():
             "status": "error",
             "message": str(e)
         }), 500
+
+# =========================================================
+# RUN
+# =========================================================
+
+if __name__ == "__main__":
+
+    port = int(
+        os.getenv(
+            "PORT",
+            "10000"
+        )
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=False
+    )
+
+
