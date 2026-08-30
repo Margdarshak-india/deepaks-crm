@@ -1,9 +1,20 @@
-% extends "base.html" %}
-
-{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contacts - Deepak's CRM</title>
 <style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#f4f7fb;color:#172033}
+body{font-family:Arial,Helvetica,sans-serif}
+a{text-decoration:none}
+
 .crm-contacts{max-width:1400px;margin:0 auto;padding:10px 4px 30px;font-family:Arial,Helvetica,sans-serif}.crm-toolbar{background:linear-gradient(135deg,#0f2a5f,#1769aa);color:#fff;border-radius:12px;padding:14px 18px;margin-bottom:20px;box-shadow:0 4px 14px rgba(15,42,95,.16)}.crm-toolbar-top{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}.crm-brand{font-size:20px;font-weight:700}.crm-nav{display:flex;gap:7px;flex-wrap:wrap}.crm-nav a{color:#fff;text-decoration:none;padding:8px 12px;border-radius:7px;font-size:14px}.crm-nav a:hover,.crm-nav a.active{background:rgba(255,255,255,.18)}.page-title{margin-bottom:18px}.page-title h1{margin:0;color:#172b4d;font-size:28px}.page-title p{margin:5px 0 0;color:#6b7280;font-size:14px}.grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(280px,.8fr);gap:18px;margin-bottom:20px}.panel{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 3px 12px rgba(0,0,0,.06)}.panel h2{margin:0 0 8px;color:#172b4d;font-size:18px}.muted{color:#6b7280;font-size:14px;margin:0 0 14px}.form{display:flex;align-items:center;gap:10px;flex-wrap:wrap}input[type=file]{flex:1;min-width:220px;border:1px solid #d1d5db;border-radius:8px;padding:9px;background:#f9fafb}.btn{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;font-weight:600;font-size:13px}.btn-primary{background:#1769aa;color:#fff}.btn-danger{background:#dc3545;color:#fff}.btn-danger-dark{background:#b91c1c;color:#fff}pre{margin:0;padding:13px;background:#f6f8fb;border:1px solid #e5e7eb;border-radius:8px;overflow-x:auto;font-size:13px;line-height:1.5}.contacts-panel{padding:0;overflow:hidden}.contacts-header{padding:18px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.contacts-header h2{margin:0;color:#172b4d;font-size:20px}.actions{display:flex;gap:8px;flex-wrap:wrap}.table-wrap{width:100%;overflow-x:auto}.table{width:100%;border-collapse:collapse;min-width:650px}.table th{background:#f4f7fb;color:#374151;font-size:13px;font-weight:700;text-align:left;padding:13px 12px;border-bottom:1px solid #e5e7eb;white-space:nowrap}.table td{padding:12px;border-bottom:1px solid #eef0f3;color:#374151;font-size:14px;vertical-align:middle}.table tbody tr:hover{background:#f8fbff}.table th:first-child,.table td:first-child{text-align:center;width:45px}.group-badge{display:inline-block;padding:4px 9px;border-radius:20px;background:#eaf3ff;color:#1769aa;font-size:12px;font-weight:600}.empty{text-align:center!important;padding:35px!important;color:#6b7280!important}@media(max-width:800px){.grid{grid-template-columns:1fr}.crm-toolbar-top{align-items:flex-start}.page-title h1{font-size:24px}}
+
 </style>
+</head>
+<body>
 <div class="crm-contacts">
 <div class="crm-toolbar"><div class="crm-toolbar-top"><div class="crm-brand">Deepak's CRM</div><nav class="crm-nav"><a href="{{ url_for('dashboard') }}">Dashboard</a><a href="{{ url_for('contacts') }}" class="active">Contacts</a><a href="{{ url_for('campaigns') }}">Campaigns</a><a href="{{ url_for('messages') }}">Messages</a><a href="{{ url_for('incoming') }}">Incoming</a><a href="{{ url_for('settings') }}">Settings</a></nav></div></div>
 
@@ -47,7 +58,7 @@ Priya,919812345678,MBBS</pre>
 
 <div class="panel contacts-panel">
 
-<div class="contacts-header">justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:15px;">
+<div class="contacts-header">
 
 <h2>All Contacts</h2>
 
@@ -221,6 +232,41 @@ document.addEventListener("DOMContentLoaded", function() {
 
 </script>
 
-{% endblock %}
 
+<script>
+function toggleAllContacts(source){
+    const checkboxes=document.querySelectorAll('.contact-checkbox');
+    checkboxes.forEach(function(checkbox){checkbox.checked=source.checked;});
+}
+document.addEventListener('DOMContentLoaded',function(){
+    const checkboxes=document.querySelectorAll('.contact-checkbox');
+    const selectAll=document.getElementById('selectAll');
+    checkboxes.forEach(function(checkbox){
+        checkbox.addEventListener('change',function(){
+            const checked= document.querySelectorAll('.contact-checkbox:checked').length;
+            selectAll.checked=checkboxes.length>0 && checked===checkboxes.length;
+            selectAll.indeterminate=checked>0 && checked<checkboxes.length;
+        });
+    });
+});
+</script>
+<script>
+function toggleAllContacts(source){
+    const checkboxes=document.querySelectorAll('.contact-checkbox');
+    checkboxes.forEach(function(checkbox){checkbox.checked=source.checked;});
+}
+document.addEventListener('DOMContentLoaded',function(){
+    const checkboxes=document.querySelectorAll('.contact-checkbox');
+    const selectAll=document.getElementById('selectAll');
+    checkboxes.forEach(function(checkbox){
+        checkbox.addEventListener('change',function(){
+            const checked=document.querySelectorAll('.contact-checkbox:checked').length;
+            selectAll.checked=checkboxes.length>0 && checked===checkboxes.length;
+            selectAll.indeterminate=checked>0 && checked<checkboxes.length;
+        });
+    });
+});
+</script>
+</body>
+</html>
 
