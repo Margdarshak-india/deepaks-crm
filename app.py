@@ -2544,13 +2544,9 @@ def webhook_verify():
     methods=["POST"]
 )
 def webhook_receive():
-
-    if not verify_meta_signature():
-
-        return (
-            "Invalid signature",
-            403
-        )
+    print("=== WEBHOOK POST RECEIVED ===")
+    print("SIGNATURE:", request.headers.get("X-Hub-Signature-256"))
+    print("BODY:", request.get_data(as_text=True))
 
     c = None
 
