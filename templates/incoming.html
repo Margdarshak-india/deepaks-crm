@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Incoming WhatsApp - Deepak's CRM</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f4f7fb;
+            color: #222;
+        }
+
+        .navbar {
+            background: #168bc4;
+            color: white;
+            padding: 14px 4%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .brand {
+            font-size: 21px;
+            font-weight: bold;
+            text-decoration: none;
+            color: white;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 11px;
+            border-radius: 7px;
+        }
+
+        .nav-links a:hover {
+            background: rgba(255,255,255,.16);
+        }
+
+        .wrap {
+            width: 94%;
+            max-width: 1250px;
+            margin: 25px auto;
+        }
+
+        h1 {
+            color: #168bc4;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 4px 18px rgba(0,0,0,.08);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 850px;
+        }
+
+        th {
+            background: #168bc4;
+            color: white;
+            padding: 13px;
+            text-align: left;
+        }
+
+        td {
+            padding: 13px;
+            border-bottom: 1px solid #e5e5e5;
+            vertical-align: top;
+        }
+
+        tr:hover td {
+            background: #f8fbfd;
+        }
+
+        .phone {
+            font-weight: bold;
+            color: #0879ad;
+        }
+
+        .message {
+            max-width: 450px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .type {
+            display: inline-block;
+            padding: 5px 9px;
+            border-radius: 15px;
+            background: #e9f7ff;
+            color: #0879ad;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .wa-id {
+            max-width: 280px;
+            word-break: break-all;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 40px;
+            color: #777;
+        }
+
+        .refresh {
+            display: inline-block;
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            background: #20a05a;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+        }
+
+        @media (max-width: 700px) {
+
+            .navbar {
+                padding: 12px 3%;
+            }
+
+            .nav-links {
+                width: 100%;
+            }
+
+            .nav-links a {
+                flex: 1;
+                text-align: center;
+            }
+
+            .wrap {
+                width: 96%;
+                margin: 15px auto;
+            }
+
+            h1 {
+                font-size: 25px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="navbar">
+
+    <a class="brand" href="{{ url_for('dashboard') }}">
+        Deepak's CRM
+    </a>
+
+    <div class="nav-links">
+
+        <a href="{{ url_for('dashboard') }}">
+            Dashboard
+        </a>
+
+        <a href="{{ url_for('contacts') }}">
+            Contacts
+        </a>
+
+        <a href="{{ url_for('campaigns') }}">
+            Campaigns
+        </a>
+
+        <a href="{{ url_for('google_drive') }}">
+            Google Drive
+        </a>
+
+        <a href="{{ url_for('messages') }}">
+            Messages
+        </a>
+
+        <a href="{{ url_for('incoming') }}">
+            Incoming
+        </a>
+
+        <a href="{{ url_for('settings') }}">
+            Settings
+        </a>
+
+    </div>
+
+</div>
+
+
+<div class="wrap">
+
+    <h1>Incoming WhatsApp Messages</h1>
+
+    <a class="refresh" href="{{ url_for('incoming') }}">
+        🔄 Refresh
+    </a>
+
+    <div class="card">
+
+        {% if rows %}
+
+        <table>
+
+            <thead>
+
+                <tr>
+                    <th>ID</th>
+                    <th>Phone</th>
+                    <th>Message Type</th>
+                    <th>Message</th>
+                    <th>WhatsApp Message ID</th>
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for row in rows %}
+
+                <tr>
+
+                    <td>
+                        {{ row["id"] }}
+                    </td>
+
+                    <td class="phone">
+                        {{ row["phone"] or "-" }}
+                    </td>
+
+                    <td>
+                        <span class="type">
+                            {{ row["message_type"] or "unknown" }}
+                        </span>
+                    </td>
+
+                    <td class="message">
+                        {{ row["message"] or "-" }}
+                    </td>
+
+                    <td class="wa-id">
+                        {{ row["wa_message_id"] or "-" }}
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+        {% else %}
+
+        <div class="empty">
+            <h3>No incoming WhatsApp messages yet.</h3>
+            <p>
+                जब कोई व्यक्ति आपके WhatsApp Business number पर message करेगा,
+                वह यहाँ दिखाई देगा।
+            </p>
+        </div>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+</body>
+</html>
