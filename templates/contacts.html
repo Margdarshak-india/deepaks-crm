@@ -1,13 +1,18 @@
 % extends "base.html" %}
 
 {% block content %}
+<style>
+.crm-contacts{max-width:1400px;margin:0 auto;padding:10px 4px 30px;font-family:Arial,Helvetica,sans-serif}.crm-toolbar{background:linear-gradient(135deg,#0f2a5f,#1769aa);color:#fff;border-radius:12px;padding:14px 18px;margin-bottom:20px;box-shadow:0 4px 14px rgba(15,42,95,.16)}.crm-toolbar-top{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}.crm-brand{font-size:20px;font-weight:700}.crm-nav{display:flex;gap:7px;flex-wrap:wrap}.crm-nav a{color:#fff;text-decoration:none;padding:8px 12px;border-radius:7px;font-size:14px}.crm-nav a:hover,.crm-nav a.active{background:rgba(255,255,255,.18)}.page-title{margin-bottom:18px}.page-title h1{margin:0;color:#172b4d;font-size:28px}.page-title p{margin:5px 0 0;color:#6b7280;font-size:14px}.grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(280px,.8fr);gap:18px;margin-bottom:20px}.panel{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 3px 12px rgba(0,0,0,.06)}.panel h2{margin:0 0 8px;color:#172b4d;font-size:18px}.muted{color:#6b7280;font-size:14px;margin:0 0 14px}.form{display:flex;align-items:center;gap:10px;flex-wrap:wrap}input[type=file]{flex:1;min-width:220px;border:1px solid #d1d5db;border-radius:8px;padding:9px;background:#f9fafb}.btn{border:0;border-radius:8px;padding:9px 14px;cursor:pointer;font-weight:600;font-size:13px}.btn-primary{background:#1769aa;color:#fff}.btn-danger{background:#dc3545;color:#fff}.btn-danger-dark{background:#b91c1c;color:#fff}pre{margin:0;padding:13px;background:#f6f8fb;border:1px solid #e5e7eb;border-radius:8px;overflow-x:auto;font-size:13px;line-height:1.5}.contacts-panel{padding:0;overflow:hidden}.contacts-header{padding:18px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.contacts-header h2{margin:0;color:#172b4d;font-size:20px}.actions{display:flex;gap:8px;flex-wrap:wrap}.table-wrap{width:100%;overflow-x:auto}.table{width:100%;border-collapse:collapse;min-width:650px}.table th{background:#f4f7fb;color:#374151;font-size:13px;font-weight:700;text-align:left;padding:13px 12px;border-bottom:1px solid #e5e7eb;white-space:nowrap}.table td{padding:12px;border-bottom:1px solid #eef0f3;color:#374151;font-size:14px;vertical-align:middle}.table tbody tr:hover{background:#f8fbff}.table th:first-child,.table td:first-child{text-align:center;width:45px}.group-badge{display:inline-block;padding:4px 9px;border-radius:20px;background:#eaf3ff;color:#1769aa;font-size:12px;font-weight:600}.empty{text-align:center!important;padding:35px!important;color:#6b7280!important}@media(max-width:800px){.grid{grid-template-columns:1fr}.crm-toolbar-top{align-items:flex-start}.page-title h1{font-size:24px}}
+</style>
+<div class="crm-contacts">
+<div class="crm-toolbar"><div class="crm-toolbar-top"><div class="crm-brand">Deepak's CRM</div><nav class="crm-nav"><a href="{{ url_for('dashboard') }}">Dashboard</a><a href="{{ url_for('contacts') }}" class="active">Contacts</a><a href="{{ url_for('campaigns') }}">Campaigns</a><a href="{{ url_for('messages') }}">Messages</a><a href="{{ url_for('incoming') }}">Incoming</a><a href="{{ url_for('settings') }}">Settings</a></nav></div></div>
 
-<h1>Contacts</h1>
+<div class="page-title"><h1>Contacts</h1><p>Import, manage and organize your customer contacts.</p></div>
 
 <div class="grid">
 
 <div class="panel">
-<h2>CSV Import</h2>
+<h2>Import Contacts</h2>
 
 <p class="muted">
 Columns: Student Name, Mobile, Group
@@ -22,13 +27,13 @@ accept=".csv"
 required
 >
 
-<button class="btn">Import</button>
+<button class="btn btn-primary">Import Contacts</button>
 
 </form>
 </div>
 
 <div class="panel">
-<h2>Example</h2>
+<h2>CSV Format</h2>
 
 <pre>Student Name,Mobile,Group
 Rahul,919876543210,GGV
@@ -40,13 +45,13 @@ Priya,919812345678,MBBS</pre>
 
 <br>
 
-<div class="panel">
+<div class="panel contacts-panel">
 
-<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:15px;">
+<div class="contacts-header">justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:15px;">
 
-<h2 style="margin:0;">Contacts</h2>
+<h2>All Contacts</h2>
 
-<div style="display:flex;gap:8px;flex-wrap:wrap;">
+<div class="actions">
 
 <form
 method="POST"
@@ -87,7 +92,7 @@ style="background:#b91c1c;color:white;border:none;padding:8px 12px;border-radius
 
 </div>
 
-<table class="table">
+<div class="table-wrap"><table class="table">
 
 <tr>
 
@@ -127,7 +132,7 @@ class="contact-checkbox"
 
 <td>{{ r.phone }}</td>
 
-<td>{{ r.group_name }}</td>
+<td><span class="group-badge">{{ r.group_name }}</span></td>
 
 <td>
 
@@ -164,8 +169,9 @@ No contacts.
 
 {% endfor %}
 
-</table>
+</table></div>
 
+</div>
 </div>
 
 <script>
@@ -216,4 +222,5 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 
 {% endblock %}
+
 
