@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Prepare & Send Template - Margdarshak's CRM{% endblock %}
+{% block page_name %}Prepare & Send Template{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>📤 Prepare &amp; Send Campaign</h1>
+  <p>Review the approved Meta template and provide any required media or variables before sending.</p>
+</div>
+
+<div class="card">
+  <div class="notice" style="margin-bottom:16px">
+    <strong>Template:</strong> {{ campaign.template_name }} &nbsp; | &nbsp;
+    <strong>Language:</strong> {{ campaign.template_language }}
+  </div>
+
+  {% if selected.body_text %}
+  <div class="notice" style="white-space:pre-wrap;margin-bottom:16px"><strong>Message:</strong>
+{{ selected.body_text }}</div>
+  {% endif %}
+
+  <form method="POST" enctype="multipart/form-data"
+        onsubmit="return confirm('Send this approved template campaign now?')">
+
+    {% if expected_count %}
+    <div class="attachment-box" style="margin-bottom:18px">
+      <h2 style="font-size:16px">🔤 Template Variables <span class="muted">(Required for sending)</span></h2>
+      {% for i in range(1, expected_count + 1) %}
+      <div style="margin-top:12px">
+        <label>Variable {{ '{{' }}{{ i }}{{ '}}' }}</label>
+        <input type="text" name="var_{{ i }}" required
+               value="{{ existing_values[i-1] if existing_values|length >= i else '' }}"
+               placeholder="Enter value for {{ '{{' }}{{ i }}{{ '}}' }}">
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if header_media_type %}
+    <div class="attachment-box" style="margin-bottom:18px">
+      <h2 style="font-size:16px">
+        {% if header_media_type == 'image' %}🖼️{% elif header_media_type == 'video' %}🎬{% else %}📄{% endif %}
+        {{ header_media_type|upper }} Header Media <span class="muted">(Required for sending)</span>
+      </h2>
+      <p class="muted">This Meta template has a {{ header_media_type|upper }} header. Upload the file to use for this message.</p>
+      {% if existing_media %}
+        <div class="badge success" style="margin-bottom:10px">✓ A media file is already saved for this campaign. You can upload another file to replace it.</div>
+      {% endif %}
+      <input type="file" name="header_media"
+        {% if header_media_type == 'image' %}accept="image/jpeg,image/png"{% elif header_media_type == 'video' %}accept="video/mp4,video/3gpp"{% else %}accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"{% endif %}
+        {% if not existing_media %}required{% endif %}>
+      <div class="hint" style="margin-top:10px">
+        {% if header_media_type == 'image' %}JPG/PNG{% elif header_media_type == 'video' %}MP4/3GP{% else %}PDF/DOC/DOCX/XLS/XLSX/PPT/PPTX/TXT{% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn green" type="submit">📤 Send Campaign</button>
+      <a class="btn soft" href="{{ url_for('template_campaigns') }}">← Back</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
