@@ -3626,46 +3626,37 @@ def template_campaigns():
         header_media_type = selected.get("header_media_type", "")
 
         uploaded_media = request.files.get("header_media")
-        if selected.get("has_media_header"):
-            if uploaded_media and uploaded_media.filename:
-                filename = secure_filename(uploaded_media.filename)
-                if not filename:
-                    flash("Invalid media filename.")
-                    return redirect(url_for("template_campaigns"))
+        if selected.get("has_media_header") and uploaded_media and uploaded_media.filename:
+            filename = secure_filename(uploaded_media.filename)
+            if not filename:
+                flash("Invalid media filename.")
+                return redirect(url_for("template_campaigns"))
 
-                ext = os.path.splitext(filename)[1].lower()
-                allowed = {
-                    "image": {".jpg", ".jpeg", ".png"},
-                    "video": {".mp4", ".3gp"},
-                    "document": {
-                        ".pdf", ".doc", ".docx", ".xls", ".xlsx",
-                        ".ppt", ".pptx", ".txt"
-                    }
+            ext = os.path.splitext(filename)[1].lower()
+            allowed = {
+                "image": {".jpg", ".jpeg", ".png"},
+                "video": {".mp4", ".3gp"},
+                "document": {
+                    ".pdf", ".doc", ".docx", ".xls", ".xlsx",
+                    ".ppt", ".pptx", ".txt"
                 }
+            }
 
-                if ext not in allowed.get(header_media_type, set()):
-                    flash(
-                        f"This template requires a {header_media_type.upper()} header. "
-                        f"Please upload a compatible file."
-                    )
-                    return redirect(url_for("template_campaigns"))
+            if ext not in allowed.get(header_media_type, set()):
+                flash(
+                    f"This template requires a {header_media_type.upper()} header. "
+                    f"Please upload a compatible file."
+                )
+                return redirect(url_for("template_campaigns"))
 
-                upload_dir = os.path.join("static", "uploads", "template_headers")
-                os.makedirs(upload_dir, exist_ok=True)
+            upload_dir = os.path.join("static", "uploads", "template_headers")
+            os.makedirs(upload_dir, exist_ok=True)
+            safe_name = f"{secrets.token_hex(8)}_{filename}"
+            header_media_path = os.path.join(upload_dir, safe_name)
+            uploaded_media.save(header_media_path)
 
-                safe_name = f"{secrets.token_hex(8)}_{filename}"
-                header_media_path = os.path.join(upload_dir, safe_name)
-                uploaded_media.save(header_media_path)
-
-            # Backward compatibility for the existing MBBS image campaign.
-            elif selected.get("has_image_header"):
-                legacy_path = "static/uploads/mbbs_admission_alert.jpg"
-                if os.path.exists(legacy_path):
-                    header_media_path = legacy_path
-                    header_media_type = "image"
-
-            # Header media is intentionally optional while SAVING the campaign.
-            # It is required only when the user actually prepares/sends the campaign.
+        # Media is intentionally optional while saving. If it is not supplied,
+        # the Send dialog will request it later when the template requires it.
 
         # Variables are OPTIONAL while creating/saving the campaign.
         # If values are provided, they must match the number of Meta variables.
@@ -3676,12 +3667,8 @@ def template_campaigns():
 
         expected_variables = int(selected.get("variable_count", 0) or 0)
 
-        non_empty_values = [v for v in parameter_values if v]
-        if non_empty_values and len(parameter_values) != expected_variables:
-            flash(
-                f"Enter all {expected_variables} variable values, or leave them all blank."
-            )
-            return redirect(url_for("template_campaigns"))
+        # Variables are optional while saving. If some values are supplied,
+        # preserve them; completeness is checked when Send is pressed.
 
         if target_type == "group" and not group_name:
             flash("Please select a contact group.")
@@ -3788,7 +3775,7 @@ def delete_template_campaign(cid):
     return redirect(url_for("template_campaigns"))
 
 
-@app.route("/template-campaign/<int:cid>/send", methods=["GET", "POST"])
+@app.route("/template-campaign/<int:cid>/send", methods=["POST"])
 def send_template_campaign(cid):
     c = db()
 
@@ -3821,78 +3808,79 @@ def send_template_campaign(cid):
             flash("Template is not approved. Sending is disabled.")
             return redirect(url_for("template_campaigns"))
 
+        # Send-time values/media are supplied by the inline Send dialog.
+        send_parameters = request.form.get("parameters", "").strip()
+        if send_parameters:
+            values = [x.strip() for x in send_parameters.split("||")]
+        else:
+            raw_parameters = campaign["parameters"] or ""
+            values = raw_parameters.split("||") if raw_parameters else []
+
         expected_count = int(selected.get("variable_count", 0) or 0)
+        if expected_count:
+            if len(values) != expected_count or any(not x.strip() for x in values):
+                flash(
+                    f"Before sending, please fill all {expected_count} template variable(s)."
+                )
+                return redirect(url_for("template_campaigns"))
+
+        header_media_id = None
         header_media_type = selected.get("header_media_type", "")
 
-        # GET = show a final Send/Prepare screen. This is where media and
-        # variables become mandatory when the Meta template requires them.
-        if request.method == "GET":
-            existing_values = (campaign["parameters"] or "").split("||") if campaign["parameters"] else []
-            existing_values += [""] * max(0, expected_count - len(existing_values))
-            return render_template(
-                "template_campaign_send.html",
-                campaign=campaign,
-                selected=selected,
-                expected_count=expected_count,
-                existing_values=existing_values[:expected_count],
-                header_media_type=header_media_type,
-                existing_media=campaign.get("header_media_path") or campaign.get("header_image_path")
-            )
-
-        # POST = validate the final values/media, save them to the campaign,
-        # then send. Media and variables are NOT required at campaign creation.
-        parameter_values = []
-        if expected_count:
-            for i in range(1, expected_count + 1):
-                parameter_values.append(request.form.get(f"var_{i}", "").strip())
-            if any(not v for v in parameter_values):
-                flash(f"Please fill all {expected_count} template variable(s) before sending.")
-                return redirect(url_for("send_template_campaign", cid=cid))
-
-        parameters_to_save = "||".join(parameter_values) if expected_count else ""
-
-        uploaded_media = request.files.get("header_media")
-        media_path = campaign.get("header_media_path") or campaign.get("header_image_path")
-        media_type = header_media_type
-
         if selected.get("has_media_header"):
+            uploaded_media = request.files.get("header_media")
+            media_path = None
+
             if uploaded_media and uploaded_media.filename:
                 filename = secure_filename(uploaded_media.filename)
-                if not filename:
-                    flash("Invalid media filename.")
-                    return redirect(url_for("send_template_campaign", cid=cid))
-
                 ext = os.path.splitext(filename)[1].lower()
                 allowed = {
                     "image": {".jpg", ".jpeg", ".png"},
                     "video": {".mp4", ".3gp"},
-                    "document": {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt"}
+                    "document": {
+                        ".pdf", ".doc", ".docx", ".xls", ".xlsx",
+                        ".ppt", ".pptx", ".txt"
+                    }
                 }
-                if ext not in allowed.get(media_type, set()):
-                    flash(f"Please upload a compatible {media_type.upper()} file.")
-                    return redirect(url_for("send_template_campaign", cid=cid))
+                if not filename or ext not in allowed.get(header_media_type, set()):
+                    flash(f"Please upload a valid {header_media_type.upper()} file before sending.")
+                    return redirect(url_for("template_campaigns"))
 
                 upload_dir = os.path.join("static", "uploads", "template_headers")
                 os.makedirs(upload_dir, exist_ok=True)
-                safe_name = f"{secrets.token_hex(8)}_{filename}"
-                media_path = os.path.join(upload_dir, safe_name)
+                media_path = os.path.join(
+                    upload_dir, f"{secrets.token_hex(8)}_{filename}"
+                )
                 uploaded_media.save(media_path)
+            else:
+                media_path = campaign["header_media_path"] or campaign["header_image_path"]
+                if not media_path or not os.path.exists(media_path):
+                    flash(f"Please upload the required {header_media_type.upper()} header media before sending.")
+                    return redirect(url_for("template_campaigns"))
 
-            if not media_path or not os.path.exists(media_path):
-                flash(f"This template requires a {media_type.upper()} header media file before sending.")
-                return redirect(url_for("send_template_campaign", cid=cid))
-
-        c.execute(
-            "UPDATE template_campaigns SET parameters = ?, header_image_path = ?, header_media_path = ?, header_media_type = ? WHERE id = ?",
-            (
-                parameters_to_save or None,
-                media_path if media_type == "image" else None,
-                media_path or None,
-                media_type or None,
-                cid
+            header_media_id, media_error = upload_whatsapp_media(
+                media_path, header_media_type
             )
-        )
-        c.commit()
+            if not header_media_id:
+                flash(f"Template header media upload failed: {media_error}")
+                return redirect(url_for("template_campaigns"))
+
+            c.execute(
+                "UPDATE template_campaigns SET header_media_path = ?, header_image_path = ?, header_media_type = ?, header_media_id = ?, parameters = ? WHERE id = ?",
+                (
+                    media_path,
+                    media_path if header_media_type == "image" else campaign["header_image_path"],
+                    header_media_type,
+                    header_media_id,
+                    send_parameters or campaign["parameters"],
+                    cid
+                )
+            )
+        elif send_parameters:
+            c.execute(
+                "UPDATE template_campaigns SET parameters = ? WHERE id = ?",
+                (send_parameters, cid)
+            )
 
         recipients = template_campaign_recipients(campaign)
 
@@ -3900,34 +3888,8 @@ def send_template_campaign(cid):
             flash("No recipients found.")
             return redirect(url_for("template_campaigns"))
 
-        values = parameter_values
-
         sent = 0
         failed = 0
-
-        header_media_id = None
-
-        if selected.get("has_media_header"):
-            media_path = media_path or campaign.get("header_media_path") or campaign.get("header_image_path")
-            if not media_path or not os.path.exists(media_path):
-                flash(
-                    f"This template requires a {header_media_type.upper()} header media file."
-                )
-                return redirect(url_for("template_campaigns"))
-
-            header_media_id, media_error = upload_whatsapp_media(
-                media_path,
-                header_media_type
-            )
-
-            if not header_media_id:
-                flash(f"Template header media upload failed: {media_error}")
-                return redirect(url_for("template_campaigns"))
-
-            c.execute(
-                "UPDATE template_campaigns SET header_media_id = ? WHERE id = ?",
-                (header_media_id, cid)
-            )
 
         for contact in recipients:
             phone = clean_phone(contact.get("phone") or "")
