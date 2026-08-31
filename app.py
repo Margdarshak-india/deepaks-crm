@@ -20,10 +20,12 @@ import requests
 import hmac
 import hashlib
 import json
+import mimetypes
 import secrets
 
 from datetime import datetime
 from urllib.parse import urlencode
+from werkzeug.utils import secure_filename
 
 
 # =========================================================
@@ -212,6 +214,12 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        # Existing installations: support IMAGE header templates.
+        c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS header_image_path TEXT")
+        c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS header_media_id TEXT")
+        c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS header_media_path TEXT")
+        c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS header_media_type TEXT")
 
         c.commit()
 
@@ -595,37 +603,21 @@ def send_whatsapp_template(
     phone,
     template_name,
     language_code="en_US",
-    parameters=None
+    parameters=None,
+    header_media_id=None,
+    header_media_type=None
 ):
-
-    token = get_env(
-        "WHATSAPP_ACCESS_TOKEN"
-    )
-
-    phone_id = get_env(
-        "WHATSAPP_PHONE_NUMBER_ID"
-    )
+    token = get_env("WHATSAPP_ACCESS_TOKEN")
+    phone_id = get_env("WHATSAPP_PHONE_NUMBER_ID")
 
     if not token or not phone_id:
-
-        return (
-            False,
-            None,
-            "WhatsApp API credentials missing"
-        )
+        return False, None, "WhatsApp API credentials missing"
 
     phone = clean_phone(phone)
-
     if not phone:
-
-        return (
-            False,
-            None,
-            "Invalid phone number"
-        )
+        return False, None, "Invalid phone number"
 
     url = whatsapp_messages_url()
-
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
@@ -633,25 +625,37 @@ def send_whatsapp_template(
 
     template = {
         "name": template_name,
-        "language": {
-            "code": language_code
-        }
+        "language": {"code": language_code}
     }
 
-    if parameters:
+    components = []
 
-        template["components"] = [
-            {
-                "type": "body",
-                "parameters": [
-                    {
-                        "type": "text",
-                        "text": str(value)
-                    }
-                    for value in parameters
-                ]
-            }
-        ]
+    if header_media_id and header_media_type in ("image", "video", "document"):
+        media_payload = {"id": str(header_media_id)}
+        components.append({
+            "type": "header",
+            "parameters": [
+                {
+                    "type": header_media_type,
+                    header_media_type: media_payload
+                }
+            ]
+        })
+
+    if parameters:
+        components.append({
+            "type": "body",
+            "parameters": [
+                {
+                    "type": "text",
+                    "text": str(value)
+                }
+                for value in parameters
+            ]
+        })
+
+    if components:
+        template["components"] = components
 
     payload = {
         "messaging_product": "whatsapp",
@@ -661,7 +665,6 @@ def send_whatsapp_template(
     }
 
     try:
-
         r = requests.post(
             url,
             headers=headers,
@@ -675,46 +678,20 @@ def send_whatsapp_template(
             data = r.text
 
         if r.ok:
-
             message_id = None
-
             if isinstance(data, dict):
-
-                messages = data.get(
-                    "messages",
-                    []
-                )
-
+                messages = data.get("messages") or []
                 if messages:
+                    message_id = messages[0].get("id")
+            return True, message_id, data
 
-                    message_id = messages[0].get(
-                        "id"
-                    )
-
-            return (
-                True,
-                message_id,
-                data
-            )
-
-        return (
-            False,
-            None,
-            data
-        )
+        return False, None, data
 
     except Exception as e:
-
-        return (
-            False,
-            None,
-            str(e)
-        )
+        return False, None, str(e)
 
 
-# =========================================================
-# GOOGLE DRIVE HELPERS
-# =========================================================
+
 
 def google_headers():
 
@@ -3392,6 +3369,70 @@ def debug_templates():
 # TEMPLATE CAMPAIGNS
 # =========================================================
 
+def upload_whatsapp_media(file_path, media_type=None):
+    """Upload an image, video or document to WhatsApp Cloud API and return its media ID."""
+    token = get_env("WHATSAPP_ACCESS_TOKEN")
+    phone_id = get_env("WHATSAPP_PHONE_NUMBER_ID")
+
+    if not token or not phone_id:
+        return None, "WhatsApp API credentials missing"
+
+    if not file_path or not os.path.exists(file_path):
+        return None, f"Header media not found: {file_path}"
+
+    guessed_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+    if media_type:
+        media_type = str(media_type).lower()
+    else:
+        if guessed_type.startswith("image/"):
+            media_type = "image"
+        elif guessed_type.startswith("video/"):
+            media_type = "video"
+        else:
+            media_type = "document"
+
+    expected_prefix = {
+        "image": "image/",
+        "video": "video/"
+    }.get(media_type)
+
+    if expected_prefix and not guessed_type.startswith(expected_prefix):
+        return None, f"Selected media type is {media_type}, but file MIME type is {guessed_type}."
+
+    url = f"https://graph.facebook.com/v23.0/{phone_id}/media"
+    headers = {"Authorization": f"Bearer {token}"}
+
+    try:
+        with open(file_path, "rb") as media_file:
+            response = requests.post(
+                url,
+                headers=headers,
+                data={"messaging_product": "whatsapp", "type": media_type},
+                files={
+                    "file": (
+                        os.path.basename(file_path),
+                        media_file,
+                        guessed_type
+                    )
+                },
+                timeout=120
+            )
+
+        try:
+            data = response.json()
+        except Exception:
+            data = response.text
+
+        if response.ok and isinstance(data, dict) and data.get("id"):
+            return data["id"], None
+
+        return None, data
+
+    except Exception as e:
+        return None, str(e)
+
+
+
 def fetch_meta_templates():
     import re
     """Fetch all WhatsApp message templates from the configured WABA."""
@@ -3416,13 +3457,7 @@ def fetch_meta_templates():
         next_url = url
 
         while next_url:
-            r = requests.get(
-                next_url,
-                headers=headers,
-                params=params,
-                timeout=30
-            )
-
+            r = requests.get(next_url, headers=headers, params=params, timeout=30)
             try:
                 data = r.json()
             except Exception:
@@ -3437,6 +3472,7 @@ def fetch_meta_templates():
                 header_component = None
                 footer_component = None
                 buttons_component = None
+                header_format = ""
 
                 for component in components:
                     component_type = str(component.get("type", "")).upper()
@@ -3444,6 +3480,7 @@ def fetch_meta_templates():
                         body_text = component.get("text") or ""
                     elif component_type == "HEADER":
                         header_component = component
+                        header_format = str(component.get("format", "")).upper()
                     elif component_type == "FOOTER":
                         footer_component = component
                     elif component_type == "BUTTONS":
@@ -3466,6 +3503,14 @@ def fetch_meta_templates():
                     "header": header_component,
                     "footer": footer_component,
                     "buttons": buttons_component,
+                    "header_format": header_format,
+                    "has_image_header": header_format == "IMAGE",
+                    "has_media_header": header_format in ("IMAGE", "VIDEO", "DOCUMENT"),
+                    "header_media_type": {
+                        "IMAGE": "image",
+                        "VIDEO": "video",
+                        "DOCUMENT": "document"
+                    }.get(header_format, ""),
                     "body_text": body_text,
                     "variables": variable_numbers,
                     "variable_count": len(variable_numbers)
@@ -3482,13 +3527,11 @@ def fetch_meta_templates():
                 seen.add(key)
                 unique.append(item)
 
-        unique.sort(
-            key=lambda x: (
-                0 if x.get("name") == "mbbs_admission_alert" else 1,
-                x.get("name", "").lower(),
-                x.get("language", "")
-            )
-        )
+        unique.sort(key=lambda x: (
+            0 if x.get("name") == "mbbs_admission_alert" else 1,
+            x.get("name", "").lower(),
+            x.get("language", "")
+        ))
         return unique, None
 
     except Exception as e:
@@ -3543,11 +3586,9 @@ def meta_template_status():
 
 @app.route("/template-campaigns", methods=["GET", "POST"])
 def template_campaigns():
-
     templates, template_error = fetch_meta_templates()
 
     if request.method == "POST":
-
         name = request.form.get("name", "").strip()
         template_name = request.form.get("template_name", "").strip()
         template_language = (
@@ -3580,16 +3621,69 @@ def template_campaigns():
             flash("Only APPROVED templates can be used.")
             return redirect(url_for("template_campaigns"))
 
+        # Optional template-header media upload.
+        header_media_path = ""
+        header_media_type = selected.get("header_media_type", "")
+
+        uploaded_media = request.files.get("header_media")
+        if selected.get("has_media_header"):
+            if uploaded_media and uploaded_media.filename:
+                filename = secure_filename(uploaded_media.filename)
+                if not filename:
+                    flash("Invalid media filename.")
+                    return redirect(url_for("template_campaigns"))
+
+                ext = os.path.splitext(filename)[1].lower()
+                allowed = {
+                    "image": {".jpg", ".jpeg", ".png"},
+                    "video": {".mp4", ".3gp"},
+                    "document": {
+                        ".pdf", ".doc", ".docx", ".xls", ".xlsx",
+                        ".ppt", ".pptx", ".txt"
+                    }
+                }
+
+                if ext not in allowed.get(header_media_type, set()):
+                    flash(
+                        f"This template requires a {header_media_type.upper()} header. "
+                        f"Please upload a compatible file."
+                    )
+                    return redirect(url_for("template_campaigns"))
+
+                upload_dir = os.path.join("static", "uploads", "template_headers")
+                os.makedirs(upload_dir, exist_ok=True)
+
+                safe_name = f"{secrets.token_hex(8)}_{filename}"
+                header_media_path = os.path.join(upload_dir, safe_name)
+                uploaded_media.save(header_media_path)
+
+            # Backward compatibility for the existing MBBS image campaign.
+            elif selected.get("has_image_header"):
+                legacy_path = "static/uploads/mbbs_admission_alert.jpg"
+                if os.path.exists(legacy_path):
+                    header_media_path = legacy_path
+                    header_media_type = "image"
+
+            if not header_media_path:
+                flash(
+                    f"This template has a {header_media_type.upper()} header. "
+                    "Please upload the header media."
+                )
+                return redirect(url_for("template_campaigns"))
+
+        # Variables are OPTIONAL while creating/saving the campaign.
+        # If values are provided, they must match the number of Meta variables.
         parameter_values = [
             value.strip()
             for value in parameters.split("||")
-            if value.strip()
-        ]
+        ] if parameters else []
+
         expected_variables = int(selected.get("variable_count", 0) or 0)
-        if len(parameter_values) != expected_variables:
+
+        non_empty_values = [v for v in parameter_values if v]
+        if non_empty_values and len(parameter_values) != expected_variables:
             flash(
-                f"This template requires exactly {expected_variables} body variable(s). "
-                f"You entered {len(parameter_values)}."
+                f"Enter all {expected_variables} variable values, or leave them all blank."
             )
             return redirect(url_for("template_campaigns"))
 
@@ -3606,12 +3700,21 @@ def template_campaigns():
             c.execute("""
                 INSERT INTO template_campaigns
                 (name, template_name, template_language, target_type,
-                 group_name, manual_number, parameters, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 group_name, manual_number, parameters, status,
+                 header_image_path, header_media_path, header_media_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                name, template_name, template_language, target_type,
-                group_name or None, manual_number or None,
-                parameters or None, "Approved"
+                name,
+                template_name,
+                template_language,
+                target_type,
+                group_name or None,
+                manual_number or None,
+                parameters or None,
+                "Approved",
+                header_media_path if header_media_type == "image" else None,
+                header_media_path or None,
+                header_media_type or None
             ))
             c.commit()
             flash("Template campaign saved. Send Campaign is enabled.")
@@ -3656,8 +3759,6 @@ def template_campaigns():
                 else status.title()
             )
 
-    # Always open Meta's WhatsApp Message Templates manager directly.
-    # This intentionally does not fall back to the Business Manager home page.
     meta_template_url = "https://business.facebook.com/latest/whatsapp_manager/message_templates"
 
     return render_template(
@@ -3693,7 +3794,6 @@ def delete_template_campaign(cid):
 
 @app.route("/template-campaign/<int:cid>/send", methods=["POST"])
 def send_template_campaign(cid):
-
     c = db()
 
     try:
@@ -3731,38 +3831,61 @@ def send_template_campaign(cid):
             flash("No recipients found.")
             return redirect(url_for("template_campaigns"))
 
-        values = [
-            x.strip()
-            for x in (campaign["parameters"] or "").split("||")
-            if x.strip()
-        ]
-
         expected_count = int(selected.get("variable_count", 0) or 0)
+        raw_parameters = campaign["parameters"] or ""
+        values = raw_parameters.split("||") if raw_parameters else []
 
-        if len(values) != expected_count:
-            flash(
-                f"Template '{campaign['template_name']}' requires "
-                f"{expected_count} variable(s), but {len(values)} value(s) were provided."
-            )
-            return redirect(url_for("template_campaigns"))
+        # Variables are optional at campaign creation, but WhatsApp needs
+        # complete parameters if the selected approved template contains them.
+        if expected_count:
+            if len(values) != expected_count or any(not x.strip() for x in values):
+                flash(
+                    f"Before sending, please fill all {expected_count} "
+                    f"template variable(s)."
+                )
+                return redirect(url_for("template_campaigns"))
 
         sent = 0
         failed = 0
 
-        for contact in recipients:
+        header_media_id = None
+        header_media_type = selected.get("header_media_type", "")
 
+        if selected.get("has_media_header"):
+            media_path = campaign.get("header_media_path") or campaign.get("header_image_path")
+            if not media_path or not os.path.exists(media_path):
+                flash(
+                    f"This template requires a {header_media_type.upper()} header media file."
+                )
+                return redirect(url_for("template_campaigns"))
+
+            header_media_id, media_error = upload_whatsapp_media(
+                media_path,
+                header_media_type
+            )
+
+            if not header_media_id:
+                flash(f"Template header media upload failed: {media_error}")
+                return redirect(url_for("template_campaigns"))
+
+            c.execute(
+                "UPDATE template_campaigns SET header_media_id = ? WHERE id = ?",
+                (header_media_id, cid)
+            )
+
+        for contact in recipients:
             phone = clean_phone(contact.get("phone") or "")
             if not phone:
                 failed += 1
                 continue
 
-            send_values = values[:]
-
             ok, message_id, response = send_whatsapp_template(
                 phone,
                 campaign["template_name"],
                 campaign["template_language"],
-                send_values
+                values if expected_count else None,
+                header_media_id=header_media_id,
+                header_media_type=header_media_type
             )
 
             if ok:
