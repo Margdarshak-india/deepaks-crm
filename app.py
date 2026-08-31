@@ -21,6 +21,7 @@ import hmac
 import hashlib
 import json
 import secrets
+import re
 
 from datetime import datetime
 from urllib.parse import urlencode
@@ -1097,7 +1098,9 @@ def dashboard():
         delivered=delivered,
         read=read,
         failed=failed,
-        recent=recent
+        recent=recent,
+        whatsapp_ok=whatsapp_configured(),
+        google_connected=bool(google_token())
     )
 
 
@@ -3087,6 +3090,10 @@ def settings():
 
         google_redirect_uri=(
             GOOGLE_REDIRECT_URI
+        ),
+
+        database_configured=bool(
+            get_env("DATABASE_URL")
         )
     )
 
@@ -3509,6 +3516,22 @@ def template_campaigns():
 
         if selected["status"].upper() != "APPROVED":
             flash("Only APPROVED templates can be used.")
+            return redirect(url_for("template_campaigns"))
+
+        # Validate that the campaign contains exactly the variables
+        # required by the selected Meta template.
+        parameter_values = [
+            value.strip()
+            for value in parameters.split("||")
+            if value.strip()
+        ]
+        required_variables = int(selected.get("variable_count", 0) or 0)
+        if len(parameter_values) != required_variables:
+            flash(
+                f"Template '{template_name}' requires exactly "
+                f"{required_variables} variable(s), but "
+                f"{len(parameter_values)} value(s) were provided."
+            )
             return redirect(url_for("template_campaigns"))
 
         if target_type == "group" and not group_name:
