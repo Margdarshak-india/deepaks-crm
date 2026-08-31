@@ -221,6 +221,7 @@ def init_db():
         c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS header_media_path TEXT")
         c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS header_media_type TEXT")
         c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS selected_contact_ids TEXT")
+        c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS manual_numbers TEXT")
 
         c.commit()
 
@@ -3542,9 +3543,53 @@ def fetch_meta_templates():
 def template_campaign_recipients(campaign):
     target_type = campaign["target_type"]
 
-    if target_type == "single":
-        phone = clean_phone(campaign["manual_number"] or "")
-        return [{"id": None, "name": "Customer", "phone": phone}] if phone else []
+    # A campaign may contain a mixed send list: numbers typed manually and
+    # contacts selected from the CRM. Keep the original target modes for
+    # group/all campaigns, while single/selected campaigns use this list.
+    if target_type in ("single", "selected"):
+        recipients = []
+        seen = set()
+
+        raw_numbers = campaign.get("manual_numbers") or ""
+        try:
+            numbers = json.loads(raw_numbers) if raw_numbers else []
+            if not isinstance(numbers, list):
+                numbers = []
+        except Exception:
+            numbers = []
+
+        legacy_number = campaign.get("manual_number") or ""
+        if legacy_number and not numbers:
+            numbers = [legacy_number]
+
+        for raw in numbers:
+            phone = clean_phone(str(raw))
+            if phone and phone not in seen:
+                seen.add(phone)
+                recipients.append({"id": None, "name": "Customer", "phone": phone})
+
+        c = db()
+        try:
+            raw_ids = campaign.get("selected_contact_ids") or ""
+            try:
+                ids = [int(x) for x in json.loads(raw_ids)] if raw_ids else []
+            except Exception:
+                ids = []
+            ids = list(dict.fromkeys(ids))
+            if ids:
+                placeholders = ",".join(["?"] * len(ids))
+                rows = c.execute(
+                    f"SELECT * FROM contacts WHERE id IN ({placeholders}) ORDER BY id ASC",
+                    tuple(ids)
+                ).fetchall()
+                for row in rows:
+                    phone = clean_phone(row.get("phone") or "")
+                    if phone and phone not in seen:
+                        seen.add(phone)
+                        recipients.append(row)
+        finally:
+            c.close()
+        return recipients
 
     c = db()
     try:
@@ -3616,6 +3661,14 @@ def template_campaigns():
         target_type = request.form.get("target_type", "group").strip()
         group_name = request.form.get("group_name", "").strip()
         manual_number = clean_phone(request.form.get("manual_number", ""))
+        manual_numbers_raw = request.form.get("manual_numbers", "").strip()
+        try:
+            manual_numbers = [clean_phone(str(x)) for x in json.loads(manual_numbers_raw)] if manual_numbers_raw else []
+        except Exception:
+            manual_numbers = []
+        manual_numbers = list(dict.fromkeys([x for x in manual_numbers if x]))
+        if manual_number and manual_number not in manual_numbers:
+            manual_numbers.insert(0, manual_number)
         parameters = request.form.get("parameters", "").strip()
         selected_contact_ids_raw = request.form.get("selected_contact_ids", "").strip()
         try:
@@ -3698,12 +3751,12 @@ def template_campaigns():
             flash("Please select a contact group.")
             return redirect(url_for("template_campaigns"))
 
-        if target_type == "single" and not manual_number:
-            flash("Please enter a WhatsApp number.")
+        if target_type == "single" and not manual_numbers and not selected_contact_ids:
+            flash("Please add at least one WhatsApp number or select a contact.")
             return redirect(url_for("template_campaigns"))
 
-        if target_type == "selected" and not selected_contact_ids:
-            flash("Please select at least one contact.")
+        if target_type == "selected" and not manual_numbers and not selected_contact_ids:
+            flash("Please add at least one number or select at least one contact.")
             return redirect(url_for("template_campaigns"))
 
         c = db()
@@ -3713,8 +3766,8 @@ def template_campaigns():
                 (name, template_name, template_language, target_type,
                  group_name, manual_number, parameters, status,
                  header_image_path, header_media_path, header_media_type,
-                 selected_contact_ids)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 selected_contact_ids, manual_numbers)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 name,
                 template_name,
@@ -3727,7 +3780,8 @@ def template_campaigns():
                 header_media_path if header_media_type == "image" else None,
                 header_media_path or None,
                 header_media_type or None,
-                json.dumps(selected_contact_ids) if selected_contact_ids else None
+                json.dumps(selected_contact_ids) if selected_contact_ids else None,
+                json.dumps(manual_numbers) if manual_numbers else None
             ))
             c.commit()
             flash("Template campaign saved. Send Campaign is enabled.")
