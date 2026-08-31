@@ -88,6 +88,7 @@
         <select name="target_type" id="target_type" onchange="targetChanged()">
           <option value="group">Contact Group</option>
           <option value="single">Single Number</option>
+          <option value="selected">Select Contacts</option>
           <option value="all">All Contacts</option>
         </select>
       </div>
@@ -105,7 +106,28 @@
 
     <div id="single" style="display:none;margin-top:14px">
       <label>WhatsApp Number</label>
-      <input name="manual_number" placeholder="919876543210">
+      <input name="manual_number" id="manual_number" list="contactNumbers" inputmode="numeric" placeholder="Enter a new number or select a saved contact number">
+      <datalist id="contactNumbers">
+        {% for c in contacts %}<option value="{{ c.phone }}">{{ c.name }}{% if c.group_name %} — {{ c.group_name }}{% endif %}</option>{% endfor %}
+      </datalist>
+      <div class="hint">You can type a new number or choose a number already saved in Contacts.</div>
+    </div>
+
+    <div id="selected" style="display:none;margin-top:14px">
+      <label>Select Contacts <span class="muted">(select one or more)</span></label>
+      <input type="search" id="contactSearch" placeholder="🔎 Search name or WhatsApp number..." oninput="filterContacts()">
+      <div id="contactList" class="contact-picker">
+        {% for c in contacts %}
+        <label class="contact-option" data-search="{{ (c.name ~ ' ' ~ c.phone ~ ' ' ~ (c.group_name or ''))|lower }}">
+          <input type="checkbox" value="{{ c.id }}" onchange="updateSelectedContacts()">
+          <span><strong>{{ c.name }}</strong><small>{{ c.phone }}{% if c.group_name %} · {{ c.group_name }}{% endif %}</small></span>
+        </label>
+        {% else %}
+        <div class="empty">No contacts available.</div>
+        {% endfor %}
+      </div>
+      <input type="hidden" name="selected_contact_ids" id="selected_contact_ids" value="[]">
+      <div id="selectedContactsSummary" class="selected-summary">0 contacts selected</div>
     </div>
 
     <button class="btn blue" type="submit">💾 Save Template Campaign</button>
@@ -205,6 +227,7 @@
 <style>
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px}
 .modal-card{background:#fff;width:min(680px,100%);max-height:90vh;overflow:auto;border-radius:16px;padding:22px;box-shadow:0 18px 60px rgba(0,0,0,.25)}
+.contact-picker{border:1px solid #d8dee8;border-radius:12px;max-height:300px;overflow:auto;margin-top:8px;background:#fff}.contact-option{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #eef1f5;cursor:pointer}.contact-option:last-child{border-bottom:0}.contact-option span{display:flex;flex-direction:column}.contact-option small{opacity:.7;margin-top:2px}.selected-summary{margin-top:8px;font-weight:600;color:#087f5b}
 </style>
 <script>
 const META_TEMPLATES = {{ templates|tojson }};
@@ -220,7 +243,9 @@ function templateChanged(){
   p.style.display=body?'block':'none';
 }
 function updateParameters(){}
-function targetChanged(){const v=document.getElementById('target_type').value;document.getElementById('group').style.display=v==='group'?'block':'none';document.getElementById('single').style.display=v==='single'?'block':'none'}
+function targetChanged(){const v=document.getElementById('target_type').value;document.getElementById('group').style.display=v==='group'?'block':'none';document.getElementById('single').style.display=v==='single'?'block':'none';document.getElementById('selected').style.display=v==='selected'?'block':'none'}
+function filterContacts(){const q=(document.getElementById('contactSearch').value||'').toLowerCase().trim();document.querySelectorAll('.contact-option').forEach(el=>{el.style.display=(!q||el.dataset.search.includes(q))?'flex':'none'})}
+function updateSelectedContacts(){const ids=[...document.querySelectorAll('#contactList input[type=checkbox]:checked')].map(x=>Number(x.value));document.getElementById('selected_contact_ids').value=JSON.stringify(ids);document.getElementById('selectedContactsSummary').textContent=ids.length+' contact'+(ids.length===1?'':'s')+' selected';}
 
 function findMetaTemplate(name,lang){return META_TEMPLATES.find(t=>t.name===name && t.language===lang)||null}
 
