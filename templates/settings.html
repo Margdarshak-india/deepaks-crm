@@ -1,6 +1,14 @@
 {% extends "base.html" %}{% block title %}Settings - Margdarshak's CRM{% endblock %}{% block page_name %}Settings{% endblock %}
 {% block content %}
 <div class="heading"><h1>Settings</h1><p>WhatsApp Cloud API, database and connected services.</p></div>
+<div class="card theme-card">
+<div><h2>🎨 Appearance</h2><p class="muted" style="margin:0">Choose how Margdarshak's CRM should look on this device.</p></div>
+<div class="theme-options">
+<div class="theme-option"><input type="radio" id="themeLight" name="theme" value="light" data-theme-option onchange="setTheme(this.value)"><label for="themeLight">☀️ Light</label></div>
+<div class="theme-option"><input type="radio" id="themeDark" name="theme" value="dark" data-theme-option onchange="setTheme(this.value)"><label for="themeDark">🌙 Dark</label></div>
+<div class="theme-option"><input type="radio" id="themeSystem" name="theme" value="system" data-theme-option onchange="setTheme(this.value)"><label for="themeSystem">🖥️ System</label></div>
+</div>
+</div>
 <div class="grid">
 <div class="card"><h2>💬 WhatsApp Cloud API</h2><div class="health-row"><span>WhatsApp API</span><span class="status {% if config_ok %}approved{% else %}failed{% endif %}">{{ 'Configured' if config_ok else 'Missing' }}</span></div><p class="muted">Required: Access Token + Phone Number ID + Business Account ID.</p></div>
 <div class="card"><h2>🗄 Database</h2><div class="health-row"><span>DATABASE_URL</span><span class="status {% if database_configured %}approved{% else %}failed{% endif %}">{{ 'Configured' if database_configured else 'Missing' }}</span></div><p class="muted">PostgreSQL database connection used by the CRM.</p></div>
