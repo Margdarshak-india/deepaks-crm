@@ -1,1 +1,73 @@
-
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Template Campaign - Deepak's CRM</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f4f7fb;color:#172033}
+.sidebar{position:fixed;inset:0 auto 0 0;width:245px;background:#0f172a;color:#fff;padding:20px 14px}
+.brand{font-weight:700;font-size:18px;padding:10px 12px 24px;border-bottom:1px solid #334155;margin-bottom:18px}
+.nav a{display:block;color:#cbd5e1;text-decoration:none;padding:11px 12px;border-radius:9px;margin:4px 0;font-size:14px}
+.nav a:hover,.nav a.active{background:#2563eb;color:#fff}
+.main{margin-left:245px;min-height:100vh}.topbar{height:68px;background:#fff;border-bottom:1px solid #e5e7eb;padding:0 30px;display:flex;align-items:center;justify-content:space-between}
+.content{padding:28px 30px;max-width:1450px;margin:auto}.heading{margin-bottom:20px}.heading h1{margin:0;font-size:28px}.heading p{color:#64748b}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card,.table-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px;box-shadow:0 3px 12px #00000008;margin-bottom:20px}
+h2{font-size:18px;margin:0 0 8px}.muted{color:#64748b;font-size:13px}
+label{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}
+input,select{width:100%;padding:10px;border:1px solid #dbe2ea;border-radius:8px;background:#fff}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.btn{display:inline-block;border:0;border-radius:8px;padding:10px 14px;font-weight:600;text-decoration:none;cursor:pointer}
+.blue{background:#2563eb;color:#fff}.green{background:#16a34a;color:#fff}.gray{background:#475569;color:#fff}.disabled{background:#cbd5e1;color:#64748b}
+.full{width:100%;text-align:center;margin-top:12px}.alert{padding:11px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#1e40af;font-size:13px;margin:14px 0}
+.flash{padding:11px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;color:#065f46;margin-bottom:15px;font-size:13px}
+.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:720px}th,td{padding:12px 14px;border-bottom:1px solid #eef2f7;text-align:left;font-size:13px}th{background:#f8fafc;font-size:12px;color:#475569}
+.status{padding:5px 9px;border-radius:20px;font-size:11px;font-weight:700}.approved{background:#dcfce7;color:#166534}.pending{background:#fef3c7;color:#92400e}.rejected{background:#fee2e2;color:#991b1b}
+@media(max-width:850px){.sidebar{position:static;width:100%;min-height:auto}.main{margin-left:0}.grid,.row{grid-template-columns:1fr}.topbar{padding:0 15px}.content{padding:20px 15px}}
+</style>
+</head>
+<body>
+<aside class="sidebar">
+<div class="brand">📱 Deepak's CRM</div>
+<nav class="nav">
+<a href="/">⌂ Dashboard</a><a href="/contacts">👥 Contacts</a><a href="/campaigns">📣 Campaigns</a>
+<a href="/template-campaigns" class="active">🧩 Template Campaign</a><a href="/messages">💬 Messages</a>
+<a href="/incoming">📥 Incoming</a><a href="/webhook/logs">⚡ Webhook Logs</a><a href="/settings">⚙ Settings</a>
+</nav>
+</aside>
+<main class="main">
+<header class="topbar"><span>Deepak's CRM / <strong>Template Campaign</strong></span><a class="btn gray" href="/campaigns">Normal Campaign</a></header>
+<section class="content">
+<div class="heading"><h1>Template Campaign</h1><p>Create, verify and send approved WhatsApp templates.</p></div>
+{% with messages=get_flashed_messages() %}{% for message in messages %}<div class="flash">{{ message }}</div>{% endfor %}{% endwith %}
+<div class="grid">
+<div class="card"><h2>1. Create Template in Meta</h2><p class="muted">Create or manage the template in Meta Business Manager. After approval, return here and refresh.</p>
+<a class="btn blue full" href="{{ meta_template_url }}" target="_blank" rel="noopener">Open Meta Template Manager ↗</a></div>
+<div class="card"><h2>2. Refresh Templates</h2><p class="muted">CRM checks the templates available to your WhatsApp Business Account.</p>
+<a class="btn gray full" href="{{ url_for('template_campaigns') }}">↻ Refresh Templates</a></div>
+</div>
+<div class="card">
+<h2>Create Template Campaign</h2>
+<div class="alert">Only <strong>APPROVED</strong> templates can be sent.</div>
+<form method="POST" action="{{ url_for('template_campaigns') }}">
+<input type="hidden" name="action" value="create">
+<label>Campaign Name</label><input name="name" placeholder="e.g. Admission 2026" required>
+<div class="row">
+<div><label>Template</label><select name="template_name" id="template_name" required onchange="lang()"><option value="">-- Select Template --</option>{% for t in templates %}<option value="{{ t.name }}" data-lang="{{ t.language }}">{{ t.name }} — {{ t.language }} — {{ t.status }}</option>{% endfor %}</select></div>
+<div><label>Language</label><input id="template_language" name="template_language" readonly></div>
+</div>
+<label>Target</label><select name="target_type" id="target_type" onchange="target()"><option value="group">Contact Group</option><option value="single">Single Number</option><option value="all">All Contacts</option></select>
+<div id="group"><label>Group</label><select name="group_name"><option value="">-- Select Group --</option>{% for g in groups %}<option value="{{ g }}">{{ g }}</option>{% endfor %}</select></div>
+<div id="single" style="display:none"><label>WhatsApp Number</label><input name="manual_number" placeholder="919876543210"></div>
+<label>Template Variables</label><input name="parameters" placeholder="value1, value2, value3">
+<p class="muted">Enter body variables in order, separated by commas.</p>
+<button class="btn blue" type="submit">Save Template Campaign</button>
+</form></div>
+<div class="table-card"><h2>Template Campaigns</h2><div class="table-wrap"><table><thead><tr><th>ID</th><th>Campaign</th><th>Template</th><th>Target</th><th>Status</th><th>Action</th></tr></thead><tbody>
+{% for c in campaigns %}<tr><td>{{ c.id }}</td><td>{{ c.name }}</td><td>{{ c.template_name }}<br>{{ c.template_language }}</td><td>{{ c.target_type }}{% if c.group_name %} — {{ c.group_name }}{% endif %}</td><td><span class="status {% if c.status=='Approved' %}approved{% elif c.status=='Pending' %}pending{% elif c.status=='Rejected' %}rejected{% endif %}">{{ c.status }}</span></td><td>{% if c.status=='Approved' %}<form method="POST" action="{{ url_for('send_template_campaign',cid=c.id) }}" onsubmit="return confirm('Send this approved template campaign?')"><button class="btn green">Send Campaign</button></form>{% else %}<span class="btn disabled">Send Disabled</span>{% endif %}</td></tr>{% else %}<tr><td colspan="6">No template campaigns yet.</td></tr>{% endfor %}
+</tbody></table></div></div>
+</section></main>
+<script>
+function lang(){let o=document.querySelector('#template_name option:checked');document.getElementById('template_language').value=o?o.dataset.lang:''}
+function target(){let v=document.getElementById('target_type').value;document.getElementById('group').style.display=v==='group'?'block':'none';document.getElementById('single').style.display=v==='single'?'block':'none'}
+</script>
+</body></html>
