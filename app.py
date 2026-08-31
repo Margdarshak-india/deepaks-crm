@@ -222,6 +222,7 @@ def init_db():
         c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS header_media_type TEXT")
         c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS selected_contact_ids TEXT")
         c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS manual_numbers TEXT")
+        c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS typed_numbers TEXT")
 
         c.commit()
 
@@ -3662,6 +3663,12 @@ def template_campaigns():
         group_name = request.form.get("group_name", "").strip()
         manual_number = clean_phone(request.form.get("manual_number", ""))
         manual_numbers_raw = request.form.get("manual_numbers", "").strip()
+        typed_numbers_raw = request.form.get("typed_numbers", "").strip()
+        try:
+            typed_numbers = [clean_phone(str(x)) for x in json.loads(typed_numbers_raw)] if typed_numbers_raw else []
+        except Exception:
+            typed_numbers = []
+        typed_numbers = list(dict.fromkeys([x for x in typed_numbers if x]))
         try:
             manual_numbers = [clean_phone(str(x)) for x in json.loads(manual_numbers_raw)] if manual_numbers_raw else []
         except Exception:
@@ -3766,8 +3773,8 @@ def template_campaigns():
                 (name, template_name, template_language, target_type,
                  group_name, manual_number, parameters, status,
                  header_image_path, header_media_path, header_media_type,
-                 selected_contact_ids, manual_numbers)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 selected_contact_ids, manual_numbers, typed_numbers)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 name,
                 template_name,
@@ -3781,7 +3788,8 @@ def template_campaigns():
                 header_media_path or None,
                 header_media_type or None,
                 json.dumps(selected_contact_ids) if selected_contact_ids else None,
-                json.dumps(manual_numbers) if manual_numbers else None
+                json.dumps(manual_numbers) if manual_numbers else None,
+                json.dumps(typed_numbers) if typed_numbers else None
             ))
             c.commit()
             flash("Template campaign saved. Send Campaign is enabled.")
@@ -3815,6 +3823,28 @@ def template_campaigns():
     finally:
         c.close()
 
+    # Build history for the manual-number suggestions only.
+    # Contact-directory numbers are deliberately excluded from this list.
+    typed_number_history = []
+    for row in campaigns_list:
+        raw = row["typed_numbers"] if "typed_numbers" in row.keys() else None
+        if raw:
+            try:
+                vals = json.loads(raw)
+                if isinstance(vals, list):
+                    for v in vals:
+                        n = clean_phone(str(v))
+                        if n and n not in typed_number_history:
+                            typed_number_history.append(n)
+            except Exception:
+                pass
+        legacy = row["manual_number"] if "manual_number" in row.keys() else None
+        if legacy:
+            n = clean_phone(str(legacy))
+            if n and n not in typed_number_history:
+                typed_number_history.append(n)
+    typed_number_history = typed_number_history[:100]
+
     status_map = {
         (x["name"], x["language"]): x["status"]
         for x in templates
@@ -3838,6 +3868,7 @@ def template_campaigns():
         templates=templates,
         groups=groups,
         contacts=contacts,
+        typed_number_history=typed_number_history,
         template_error=template_error,
         meta_template_url=meta_template_url
     )
