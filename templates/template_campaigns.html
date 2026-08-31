@@ -84,7 +84,7 @@
       <h2 id="mediaTitle" style="font-size:16px">📎 Header Media</h2>
 
       <div id="mediaHint" class="hint" style="margin-bottom:10px">
-        Upload the media required by the selected Meta template header.
+        Upload media now if you want, or leave it blank. It will be required when you prepare/send the campaign.
       </div>
 
       <input type="file"
@@ -141,7 +141,7 @@
 
       <div class="hint" style="margin-top:10px">
         You may leave these fields blank while saving the campaign.
-        If the Meta template contains variables, all variable values must be filled before sending.
+        If the Meta template contains variables, you can leave them blank here. They will be required on the final Send screen.
       </div>
     </div>
 
@@ -194,7 +194,7 @@
                   action="{{ url_for('send_template_campaign',cid=c.id) }}"
                   onsubmit="return confirm('Send this approved template campaign?')"
                   style="display:inline-block;margin:0 4px 4px 0">
-              <button class="btn green" type="submit">📤 Send Campaign</button>
+              <a class="btn green" href="{{ url_for('send_template_campaign',cid=c.id) }}">📤 Prepare &amp; Send</a>
             </form>
             {% else %}
               <span class="badge neutral">Send Disabled</span>
