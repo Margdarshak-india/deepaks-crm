@@ -80,7 +80,7 @@
 <td><div class="message-preview">{% if row.message %}{{ row.message }}{% else %}<span class="hint">No message</span>{% endif %}</div></td>
 <td>{% if row.drive_file_name %}📎 <div class="attachment-name">{{ row.drive_file_name }}</div>{% elif row.drive_file_id %}📎 Attachment{% else %}<span class="hint">No attachment</span>{% endif %}</td>
 <td>{% set status=(row.status or 'Draft')|lower %}{% if status == 'failed' %}<span class="status failed">Failed</span>{% elif status == 'partial' %}<span class="status partial">Partial</span>{% elif status == 'draft' %}<span class="status draft">Draft</span>{% else %}<span class="status">{{ row.status or 'Draft' }}</span>{% endif %}</td>
-<td><div class="actions"><form method="POST" action="{{ url_for('send_campaign', cid=row.id) }}" onsubmit="return confirm('Send this campaign now?');"><button type="submit" class="btn send">Send</button></form><form method="POST" action="{{ url_for('delete_campaign', cid=row.id) }}" onsubmit="return confirm('Delete this campaign?');"><button type="submit" class="btn danger">Delete</button></form></div></td>
+<td><div class="actions"><form method="POST" action="{{ url_for('send_campaign', cid=row.id) }}" onsubmit="return confirm('Send this campaign now?');"><button type="submit" class="btn send">✉️ Send</button></form><form method="POST" action="{{ url_for('delete_campaign', cid=row.id) }}" onsubmit="return confirm('Delete this campaign?');"><button type="submit" class="btn danger">🗑️ Delete</button></form></div></td>
 </tr>
 {% endfor %}
 {% else %}<tr><td colspan="6" class="empty">No campaigns found.</td></tr>{% endif %}
