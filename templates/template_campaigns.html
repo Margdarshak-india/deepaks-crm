@@ -1,75 +1,14 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Template Campaign - Deepak's CRM</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f4f7fb;color:#172033}
-.sidebar{position:fixed;inset:0 auto 0 0;width:245px;background:#0f172a;color:#fff;padding:20px 14px}
-.brand{font-weight:700;font-size:18px;padding:10px 12px 24px;border-bottom:1px solid #334155;margin-bottom:18px}
-.nav a{display:block;color:#cbd5e1;text-decoration:none;padding:11px 12px;border-radius:9px;margin:4px 0;font-size:14px}
-.nav a:hover,.nav a.active{background:#2563eb;color:#fff}
-.main{margin-left:245px;min-height:100vh}
-.topbar{height:68px;background:#fff;border-bottom:1px solid #e5e7eb;padding:0 30px;display:flex;align-items:center;justify-content:space-between}
-.content{padding:28px 30px;max-width:1450px;margin:auto}
-.heading{margin-bottom:20px}.heading h1{margin:0;font-size:28px}.heading p{color:#64748b}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.card,.table-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px;box-shadow:0 3px 12px #00000008;margin-bottom:20px}
-h2{font-size:18px;margin:0 0 8px}.muted{color:#64748b;font-size:13px}
-label{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}
-input,select{width:100%;padding:10px;border:1px solid #dbe2ea;border-radius:8px;background:#fff}
-input[readonly]{background:#f8fafc;color:#475569}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.btn{display:inline-block;border:0;border-radius:8px;padding:10px 14px;font-weight:600;text-decoration:none;cursor:pointer}
-.blue{background:#2563eb;color:#fff}.green{background:#16a34a;color:#fff}.gray{background:#475569;color:#fff}.disabled{background:#cbd5e1;color:#64748b}
-.full{width:100%;text-align:center;margin-top:12px}
-.alert{padding:11px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#1e40af;font-size:13px;margin:14px 0}
-.flash{padding:11px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;color:#065f46;margin-bottom:15px;font-size:13px}
-.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:720px}
-th,td{padding:12px 14px;border-bottom:1px solid #eef2f7;text-align:left;font-size:13px}
-th{background:#f8fafc;font-size:12px;color:#475569}
-.status{padding:5px 9px;border-radius:20px;font-size:11px;font-weight:700}
-.approved{background:#dcfce7;color:#166534}.pending{background:#fef3c7;color:#92400e}.rejected{background:#fee2e2;color:#991b1b}
-.template-preview{margin-top:12px;padding:12px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;font-size:13px;white-space:pre-wrap;color:#334155}
-.variable-box{margin-top:14px;padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px}
-.variable-title{font-size:13px;font-weight:700;color:#334155;margin-bottom:8px}
-.variable-help{font-size:12px;color:#64748b;margin-top:8px}
-.no-vars{font-size:13px;color:#166534;background:#ecfdf5;border:1px solid #bbf7d0;padding:10px;border-radius:8px}
-@media(max-width:850px){.sidebar{position:static;width:100%;min-height:auto}.main{margin-left:0}.grid,.row{grid-template-columns:1fr}.topbar{padding:0 15px}.content{padding:20px 15px}}
-</style>
-</head>
-<body>
-<aside class="sidebar">
-<div class="brand">📱 Deepak's CRM</div>
-<nav class="nav">
-<a href="/">⌂ Dashboard</a>
-<a href="/contacts">👥 Contacts</a>
-<a href="/campaigns">📣 Campaigns</a>
-<a href="/template-campaigns" class="active">🧩 Template Campaign</a>
-<a href="/messages">💬 Messages</a>
-<a href="/incoming">📥 Incoming</a>
-<a href="/webhook/logs">⚡ Webhook Logs</a>
-<a href="/settings">⚙ Settings</a>
-</nav>
-</aside>
+{% extends "base.html" %}
+{% block title %}Template Campaign - Deepak's CRM{% endblock %}
+{% block page_name %}Template Campaign{% endblock %}
+{% block content %}
 
-<main class="main">
-<header class="topbar">
-<span>Deepak's CRM / <strong>Template Campaign</strong></span>
-<a class="btn gray" href="/campaigns">Normal Campaign</a>
-</header>
-
-<section class="content">
 <div class="heading">
 <h1>Template Campaign</h1>
 <p>Create, verify and send approved WhatsApp templates.</p>
 </div>
 
-{% with messages=get_flashed_messages() %}
-{% for message in messages %}<div class="flash">{{ message }}</div>{% endfor %}
-{% endwith %}
+
 
 <div class="grid">
 <div class="card">
@@ -176,6 +115,9 @@ data-variables='{{ t.variables|tojson }}'>
 <button class="btn green">Send Campaign</button>
 </form>
 {% else %}<span class="btn disabled">Send Disabled</span>{% endif %}
+<form method="POST" action="{{ url_for('delete_template_campaign',cid=c.id) }}" onsubmit="return confirm('Delete this template campaign?')">
+<button class="btn red">Delete</button>
+</form>
 </td>
 </tr>
 {% else %}
@@ -185,10 +127,9 @@ data-variables='{{ t.variables|tojson }}'>
 </table>
 </div>
 </div>
-</section>
-</main>
 
-<script>
+{% endblock %}
+{% block scripts %}<script>
 function templateChanged(){
     const select = document.getElementById('template_name');
     const option = select.options[select.selectedIndex];
@@ -264,6 +205,4 @@ function targetChanged(){
 document.getElementById('templateCampaignForm').addEventListener('submit', function(){
     updateParameters();
 });
-</script>
-</body>
-</html>
+</script>{% endblock %}
