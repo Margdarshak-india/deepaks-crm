@@ -3393,7 +3393,14 @@ def debug_templates():
 # =========================================================
 
 def fetch_meta_templates():
+    """
+    Fetch ALL WhatsApp message templates from the configured WABA.
 
+    Important:
+    - Handles Meta pagination instead of reading only the first page.
+    - Does not hide templates based on status/category.
+    - Preserves image/header components so image templates can be used later.
+    """
     token = get_env("WHATSAPP_ACCESS_TOKEN")
     waba_id = (
         get_env("WHATSAPP_BUSINESS_ACCOUNT_ID")
@@ -3403,57 +3410,108 @@ def fetch_meta_templates():
     if not token or not waba_id:
         return [], "WHATSAPP_ACCESS_TOKEN and WHATSAPP_BUSINESS_ACCOUNT_ID are required."
 
-    url = f"https://graph.facebook.com/v23.0/{waba_id}/message_templates"
+    base_url = f"https://graph.facebook.com/v23.0/{waba_id}/message_templates"
+    headers = {"Authorization": f"Bearer {token}"}
 
     try:
-        r = requests.get(
-            url,
-            headers={"Authorization": f"Bearer {token}"},
-            params={
-                "fields": "name,language,status,category,components",
-                "limit": 100
-            },
-            timeout=30
-        )
-        try:
-            data = r.json()
-        except Exception:
-            data = {"raw": r.text}
-
-        if not r.ok:
-            return [], json.dumps(data, ensure_ascii=False)
-
         result = []
-        import re
+        next_url = base_url
+        params = {
+            "fields": "id,name,language,status,category,components",
+            "limit": 100
+        }
 
-        for x in data.get("data", []):
-            components = x.get("components") or []
-            body_text = ""
+        while next_url:
+            r = requests.get(
+                next_url,
+                headers=headers,
+                params=params,
+                timeout=30
+            )
 
-            for component in components:
-                if str(component.get("type", "")).upper() == "BODY":
-                    body_text = component.get("text") or ""
-                    break
+            try:
+                data = r.json()
+            except Exception:
+                data = {"raw": r.text}
 
-            variable_numbers = []
-            for match in re.findall(r"\{\{\s*(\d+)\s*\}\}", body_text):
-                number = int(match)
-                if number not in variable_numbers:
-                    variable_numbers.append(number)
-            variable_numbers.sort()
+            if not r.ok:
+                return [], json.dumps(data, ensure_ascii=False)
 
-            result.append({
-                "name": x.get("name", ""),
-                "language": x.get("language", "en_US"),
-                "status": x.get("status", "UNKNOWN"),
-                "category": x.get("category", ""),
-                "components": components,
-                "body_text": body_text,
-                "variables": variable_numbers,
-                "variable_count": len(variable_numbers)
-            })
+            for x in data.get("data", []):
+                components = x.get("components") or []
+                body_text = ""
+                header_component = None
+                footer_component = None
+                buttons_component = None
 
-        return result, None
+                for component in components:
+                    component_type = str(
+                        component.get("type", "")
+                    ).upper()
+
+                    if component_type == "BODY":
+                        body_text = component.get("text") or ""
+                    elif component_type == "HEADER":
+                        header_component = component
+                    elif component_type == "FOOTER":
+                        footer_component = component
+                    elif component_type == "BUTTONS":
+                        buttons_component = component
+
+                variable_numbers = []
+                for match in re.findall(
+                    r"\{\{\s*(\d+)\s*\}\}",
+                    body_text
+                ):
+                    number = int(match)
+                    if number not in variable_numbers:
+                        variable_numbers.append(number)
+
+                variable_numbers.sort()
+
+                result.append({
+                    "id": x.get("id", ""),
+                    "name": x.get("name", ""),
+                    "language": x.get("language", "en_US"),
+                    "status": x.get("status", "UNKNOWN"),
+                    "category": x.get("category", ""),
+                    "components": components,
+                    "header": header_component,
+                    "footer": footer_component,
+                    "buttons": buttons_component,
+                    "body_text": body_text,
+                    "variables": variable_numbers,
+                    "variable_count": len(variable_numbers)
+                })
+
+            # Follow every Meta pagination page.
+            paging = data.get("paging") or {}
+            next_url = paging.get("next")
+            params = None
+
+        # Remove accidental duplicates while preserving Meta order.
+        unique = []
+        seen = set()
+
+        for item in result:
+            key = (
+                item.get("name", ""),
+                item.get("language", "")
+            )
+            if key not in seen:
+                seen.add(key)
+                unique.append(item)
+
+        # Put the newest/specific MBBS template first if present.
+        unique.sort(
+            key=lambda x: (
+                0 if x.get("name") == "mbbs_admission_alert" else 1,
+                x.get("name", "").lower(),
+                x.get("language", "")
+            )
+        )
+
+        return unique, None
 
     except Exception as e:
         return [], str(e)
@@ -3475,6 +3533,36 @@ def template_campaign_recipients(campaign):
         ).fetchall()
     finally:
         c.close()
+
+
+@app.route("/api/meta-template-status")
+def meta_template_status():
+    templates, error = fetch_meta_templates()
+
+    waba_id = (
+        get_env("WHATSAPP_BUSINESS_ACCOUNT_ID")
+        or get_env("WHATSAPP_WABA_ID")
+    )
+
+    return jsonify({
+        "waba_id": waba_id or "",
+        "error": error,
+        "template_count": len(templates),
+        "templates": [
+            {
+                "name": t.get("name"),
+                "language": t.get("language"),
+                "status": t.get("status"),
+                "category": t.get("category")
+            }
+            for t in templates
+        ],
+        "mbbs_admission_alert_found": any(
+            t.get("name") == "mbbs_admission_alert"
+            for t in templates
+        )
+    })
+
 
 
 @app.route("/template-campaigns", methods=["GET", "POST"])
@@ -3604,36 +3692,6 @@ def template_campaigns():
         template_error=template_error,
         meta_template_url=meta_template_url
     )
-
-
-@app.route("/template-campaign/<int:cid>/delete", methods=["POST"])
-def delete_template_campaign(cid):
-    c = db()
-
-    try:
-        result = c.execute(
-            """
-            DELETE FROM template_campaigns
-            WHERE id = ?
-            """,
-            (cid,)
-        )
-
-        c.commit()
-
-        if result.rowcount > 0:
-            flash("Template campaign deleted successfully.")
-        else:
-            flash("Template campaign not found.")
-
-    except Exception as e:
-        c.rollback()
-        flash(f"Delete template campaign error: {e}")
-
-    finally:
-        c.close()
-
-    return redirect(url_for("template_campaigns"))
 
 
 @app.route("/template-campaign/<int:cid>/send", methods=["POST"])
