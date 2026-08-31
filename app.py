@@ -21,7 +21,6 @@ import hmac
 import hashlib
 import json
 import secrets
-import re
 
 from datetime import datetime
 from urllib.parse import urlencode
@@ -1098,9 +1097,7 @@ def dashboard():
         delivered=delivered,
         read=read,
         failed=failed,
-        recent=recent,
-        whatsapp_ok=whatsapp_configured(),
-        google_connected=bool(google_token())
+        recent=recent
     )
 
 
@@ -3339,7 +3336,7 @@ def debug_templates():
     url = f"https://graph.facebook.com/v23.0/{waba_id}/message_templates"
 
     params = {
-        "fields": "name,language,status,category",
+        "fields": "name,language,status,category,components",
         "limit": 100
     }
 
@@ -3371,7 +3368,8 @@ def debug_templates():
                 "name": item.get("name"),
                 "language": item.get("language"),
                 "status": item.get("status"),
-                "category": item.get("category")
+                "category": item.get("category"),
+                "components": item.get("components", []) or []
             })
 
         return jsonify({
@@ -3518,19 +3516,16 @@ def template_campaigns():
             flash("Only APPROVED templates can be used.")
             return redirect(url_for("template_campaigns"))
 
-        # Validate that the campaign contains exactly the variables
-        # required by the selected Meta template.
         parameter_values = [
             value.strip()
             for value in parameters.split("||")
             if value.strip()
         ]
-        required_variables = int(selected.get("variable_count", 0) or 0)
-        if len(parameter_values) != required_variables:
+        expected_variables = int(selected.get("variable_count", 0) or 0)
+        if len(parameter_values) != expected_variables:
             flash(
-                f"Template '{template_name}' requires exactly "
-                f"{required_variables} variable(s), but "
-                f"{len(parameter_values)} value(s) were provided."
+                f"This template requires exactly {expected_variables} body variable(s). "
+                f"You entered {len(parameter_values)}."
             )
             return redirect(url_for("template_campaigns"))
 
@@ -3609,29 +3604,6 @@ def template_campaigns():
         template_error=template_error,
         meta_template_url=meta_template_url
     )
-
-
-@app.route("/template-campaign/<int:cid>/delete", methods=["POST"])
-def delete_template_campaign(cid):
-    c = db()
-    try:
-        result = c.execute(
-            "DELETE FROM template_campaigns WHERE id = ?",
-            (cid,)
-        )
-        c.commit()
-
-        if result.rowcount > 0:
-            flash("Template campaign deleted successfully.")
-        else:
-            flash("Template campaign not found.")
-    except Exception as e:
-        c.rollback()
-        flash(f"Delete template campaign error: {e}")
-    finally:
-        c.close()
-
-    return redirect(url_for("template_campaigns"))
 
 
 @app.route("/template-campaign/<int:cid>/send", methods=["POST"])
