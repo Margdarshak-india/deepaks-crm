@@ -193,6 +193,26 @@ def init_db():
             )
         """)
 
+
+        # -------------------------------------------------
+        # TEMPLATE CAMPAIGNS
+        # -------------------------------------------------
+
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS template_campaigns(
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                template_name TEXT NOT NULL,
+                template_language TEXT NOT NULL DEFAULT 'en_US',
+                target_type TEXT NOT NULL DEFAULT 'group',
+                group_name TEXT,
+                manual_number TEXT,
+                parameters TEXT,
+                status TEXT DEFAULT 'Pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         c.commit()
 
         print("DATABASE INITIALIZED SUCCESSFULLY")
@@ -3361,6 +3381,306 @@ def debug_templates():
 # =========================================================
 # RUN
 # =========================================================
+
+
+# =========================================================
+# TEMPLATE CAMPAIGNS
+# =========================================================
+
+def fetch_meta_templates():
+    token = get_env("WHATSAPP_ACCESS_TOKEN")
+    waba_id = (
+        get_env("WHATSAPP_BUSINESS_ACCOUNT_ID")
+        or get_env("WHATSAPP_WABA_ID")
+    )
+
+    if not token or not waba_id:
+        return [], "WHATSAPP_ACCESS_TOKEN and WHATSAPP_BUSINESS_ACCOUNT_ID are required."
+
+    url = f"https://graph.facebook.com/v23.0/{waba_id}/message_templates"
+
+    try:
+        r = requests.get(
+            url,
+            headers={"Authorization": f"Bearer {token}"},
+            params={"fields": "name,language,status,category", "limit": 100},
+            timeout=30
+        )
+        try:
+            data = r.json()
+        except Exception:
+            data = {"raw": r.text}
+
+        if not r.ok:
+            return [], json.dumps(data, ensure_ascii=False)
+
+        return [
+            {
+                "name": x.get("name", ""),
+                "language": x.get("language", "en_US"),
+                "status": x.get("status", "UNKNOWN"),
+                "category": x.get("category", "")
+            }
+            for x in data.get("data", [])
+        ], None
+
+    except Exception as e:
+        return [], str(e)
+
+
+def template_campaign_recipients(campaign):
+    if campaign["target_type"] == "single":
+        phone = clean_phone(campaign["manual_number"] or "")
+        return [{"id": None, "name": "Customer", "phone": phone}] if phone else []
+
+    c = db()
+    try:
+        if campaign["target_type"] == "all":
+            return c.execute("SELECT * FROM contacts ORDER BY id ASC").fetchall()
+
+        return c.execute(
+            "SELECT * FROM contacts WHERE group_name = ? ORDER BY id ASC",
+            (campaign["group_name"],)
+        ).fetchall()
+    finally:
+        c.close()
+
+
+@app.route("/template-campaigns", methods=["GET", "POST"])
+def template_campaigns():
+
+    templates, template_error = fetch_meta_templates()
+
+    if request.method == "POST":
+
+        name = request.form.get("name", "").strip()
+        template_name = request.form.get("template_name", "").strip()
+        template_language = (
+            request.form.get("template_language", "en_US").strip()
+            or "en_US"
+        )
+        target_type = request.form.get("target_type", "group").strip()
+        group_name = request.form.get("group_name", "").strip()
+        manual_number = clean_phone(request.form.get("manual_number", ""))
+        parameters = request.form.get("parameters", "").strip()
+
+        selected = next(
+            (
+                x for x in templates
+                if x["name"] == template_name
+                and x["language"] == template_language
+            ),
+            None
+        )
+
+        if not name:
+            flash("Campaign name is required.")
+            return redirect(url_for("template_campaigns"))
+
+        if not selected:
+            flash("Please select a valid Meta template.")
+            return redirect(url_for("template_campaigns"))
+
+        if selected["status"].upper() != "APPROVED":
+            flash("Only APPROVED templates can be used.")
+            return redirect(url_for("template_campaigns"))
+
+        if target_type == "group" and not group_name:
+            flash("Please select a contact group.")
+            return redirect(url_for("template_campaigns"))
+
+        if target_type == "single" and not manual_number:
+            flash("Please enter a WhatsApp number.")
+            return redirect(url_for("template_campaigns"))
+
+        c = db()
+        try:
+            c.execute("""
+                INSERT INTO template_campaigns
+                (name, template_name, template_language, target_type,
+                 group_name, manual_number, parameters, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                name, template_name, template_language, target_type,
+                group_name or None, manual_number or None,
+                parameters or None, "Approved"
+            ))
+            c.commit()
+            flash("Template campaign saved. Send Campaign is enabled.")
+        except Exception as e:
+            c.rollback()
+            flash(f"Template campaign save error: {e}")
+        finally:
+            c.close()
+
+        return redirect(url_for("template_campaigns"))
+
+    c = db()
+    try:
+        campaigns_list = c.execute(
+            "SELECT * FROM template_campaigns ORDER BY id DESC"
+        ).fetchall()
+
+        groups = [
+            x["group_name"]
+            for x in c.execute("""
+                SELECT DISTINCT group_name
+                FROM contacts
+                WHERE group_name IS NOT NULL AND group_name != ''
+                ORDER BY group_name
+            """).fetchall()
+        ]
+    finally:
+        c.close()
+
+    status_map = {
+        (x["name"], x["language"]): x["status"]
+        for x in templates
+    }
+
+    for row in campaigns_list:
+        status = status_map.get(
+            (row["template_name"], row["template_language"])
+        )
+        if status:
+            row["status"] = (
+                "Approved" if status.upper() == "APPROVED"
+                else status.title()
+            )
+
+    meta_template_url = (
+        get_env("META_TEMPLATE_MANAGER_URL")
+        or "https://business.facebook.com/"
+    )
+
+    return render_template(
+        "template_campaigns.html",
+        campaigns=campaigns_list,
+        templates=templates,
+        groups=groups,
+        template_error=template_error,
+        meta_template_url=meta_template_url
+    )
+
+
+@app.route("/template-campaign/<int:cid>/send", methods=["POST"])
+def send_template_campaign(cid):
+
+    c = db()
+
+    try:
+        campaign = c.execute(
+            "SELECT * FROM template_campaigns WHERE id = ?",
+            (cid,)
+        ).fetchone()
+
+        if not campaign:
+            flash("Template campaign not found.")
+            return redirect(url_for("template_campaigns"))
+
+        templates, error = fetch_meta_templates()
+
+        if error:
+            flash(f"Meta template check failed: {error}")
+            return redirect(url_for("template_campaigns"))
+
+        selected = next(
+            (
+                x for x in templates
+                if x["name"] == campaign["template_name"]
+                and x["language"] == campaign["template_language"]
+            ),
+            None
+        )
+
+        if not selected or selected["status"].upper() != "APPROVED":
+            flash("Template is not approved. Sending is disabled.")
+            return redirect(url_for("template_campaigns"))
+
+        recipients = template_campaign_recipients(campaign)
+
+        if not recipients:
+            flash("No recipients found.")
+            return redirect(url_for("template_campaigns"))
+
+        values = [
+            x.strip()
+            for x in (campaign["parameters"] or "").split(",")
+            if x.strip()
+        ]
+
+        sent = 0
+        failed = 0
+
+        for contact in recipients:
+
+            phone = clean_phone(contact.get("phone") or "")
+            if not phone:
+                failed += 1
+                continue
+
+            if not values:
+                send_values = [contact.get("name") or "Customer"]
+            else:
+                send_values = values[:]
+
+            ok, message_id, response = send_whatsapp_template(
+                phone,
+                campaign["template_name"],
+                campaign["template_language"],
+                send_values
+            )
+
+            if ok:
+                status = "accepted"
+                error_text = None
+                sent += 1
+            else:
+                status = "failed"
+                failed += 1
+                error_text = (
+                    json.dumps(response, ensure_ascii=False)
+                    if isinstance(response, (dict, list))
+                    else str(response)
+                )
+
+            c.execute("""
+                INSERT INTO whatsapp_messages
+                (campaign_id, contact_id, phone, message,
+                 wa_message_id, direction, status, error)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                None,
+                contact.get("id"),
+                phone,
+                "[Template] " + campaign["template_name"],
+                message_id,
+                "outgoing",
+                status,
+                error_text
+            ))
+
+        c.execute(
+            "UPDATE template_campaigns SET status = ? WHERE id = ?",
+            (f"Sent {sent}, Failed {failed}", cid)
+        )
+
+        c.commit()
+
+        flash(
+            f"Template campaign finished: "
+            f"{sent} accepted, {failed} failed."
+        )
+
+    except Exception as e:
+        c.rollback()
+        flash(f"Template campaign error: {e}")
+
+    finally:
+        c.close()
+
+    return redirect(url_for("template_campaigns"))
+
 
 if __name__ == "__main__":
 
