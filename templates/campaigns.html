@@ -1,59 +1,74 @@
 {% extends "base.html" %}
-{% block title %}Campaigns - Margdarshak's CRM{% endblock %}{% block page_name %}Campaigns{% endblock %}{% block content %}
+{% block title %}Campaigns - Margdarshak's CRM{% endblock %}
+{% block content %}
+<div class="heading"><h1>Campaigns</h1><p>Create, manage and send WhatsApp campaigns.</p></div>
 
-<div class="card">
-<h1>Create Campaign</h1>
-
+<div class="card campaign-card">
+<h2>Create Campaign</h2><p class="muted">Send a WhatsApp message to a saved number or an entire contact group.</p>
 <form method="POST" action="{{ url_for('campaigns') }}" id="campaignForm">
-<label for="name">Campaign Name <span class="required">*</span></label>
+<div class="form-section">
+<label for="name">Campaign Name <span style="color:#df4d55">*</span></label>
 <input type="text" id="name" name="name" placeholder="Enter campaign name" required>
-<label>Campaign Type</label>
+</div>
+
+<div class="form-section">
+<div class="section-title">Campaign Type</div>
 <div class="campaign-type">
 <label><input type="radio" name="campaign_type" value="single" id="singleRadio" onchange="changeCampaignType()"> Single Number</label>
 <label><input type="radio" name="campaign_type" value="group" id="groupRadio" checked onchange="changeCampaignType()"> Group</label>
 </div>
+
 <div id="groupBox" class="target-box">
 <label for="group_name">Select Contact Group</label>
 <select name="group_name" id="group_name"><option value="">-- Select Group --</option>{% for group in groups %}<option value="{{ group }}">{{ group }}</option>{% endfor %}</select>
-<div class="hint">Selected group ke sabhi saved contacts ko message bheja jayega.</div>
+<div class="hint" style="margin-top:7px">Selected group ke sabhi saved contacts ko message bheja jayega.</div>
 </div>
+
 <div id="singleBox" class="single-mode" style="display:none;">
 <label for="target_mode">Select Number</label>
 <select name="target_mode" id="target_mode" onchange="changeSingleMode()"><option value="saved">Select from Saved Contacts</option><option value="manual">Enter Number Manually</option></select>
 <div id="savedContactBox" class="saved-contact-box">
 <label for="single_number">Select Contact</label>
 <select name="single_number" id="single_number"><option value="">-- Select Contact --</option>{% for contact in contacts %}<option value="{{ contact.phone }}">{{ contact.name }} - {{ contact.phone }}</option>{% endfor %}</select>
-<div class="hint">Saved contact select karein.</div>
+<div class="hint" style="margin-top:7px">Saved contact select karein.</div>
 </div>
 <div id="manualBox" class="manual-box" style="display:none;">
 <label for="manual_number">WhatsApp Number</label>
 <input type="text" name="manual_number" id="manual_number" placeholder="Example: 919977483335" inputmode="numeric">
-<div class="hint">Country code ke saath poora WhatsApp number dalein.</div>
+<div class="hint" style="margin-top:7px">Country code ke saath poora WhatsApp number dalein.</div>
 <div class="manual-note">Manual number Contacts mein save hona zaroori nahi hai. Send karte waqt directly is number par message jayega.</div>
 </div>
 </div>
+</div>
+
+<div class="form-section">
 <label for="message">Message</label>
 <textarea name="message" id="message" placeholder="Type your WhatsApp message here..."></textarea>
-<div class="attachment-box">
+</div>
+
+<div class="form-section">
+<div class="attachment-box" style="margin-top:0">
 <div class="attachment-header">📎 Attachment from Google Drive</div>
 {% if google_connected is defined and google_connected %}<div class="drive-status">✓ Google Drive connected</div>{% else %}<div class="hint">Google Drive connected nahi hai.</div>{% endif %}
 {% if drive_error %}<div class="flash">Google Drive Error: {{ drive_error }}</div>{% endif %}
 {% if not drive_files %}
-<div class="drive-connect"><a href="{{ url_for('google_drive') }}">Connect Google Drive</a></div>
-<div class="hint">Google Drive connect karke attachment select karein.</div>
+<div style="margin-top:10px"><a class="btn gray" href="{{ url_for('google_drive') }}">Connect Google Drive</a></div>
+<div class="hint" style="margin-top:7px">Google Drive connect karke attachment select karein.</div>
 {% else %}
 <label for="drive_file_id">Select Attachment</label>
 <select name="drive_file_id" id="drive_file_id" onchange="selectDriveFile()"><option value="">-- No Attachment --</option>{% for file in drive_files %}<option value="{{ file.id }}" data-name="{{ file.name }}" data-mime="{{ file.mimeType }}">{{ file.name }}</option>{% endfor %}</select>
 <input type="hidden" name="drive_file_name" id="drive_file_name"><input type="hidden" name="drive_mime_type" id="drive_mime_type">
 <div id="selectedFile" class="selected-file"></div>
-<div class="hint">Google Drive se image, PDF, document, video, audio ya supported file select kar sakte hain.</div>
+<div class="hint" style="margin-top:7px">Google Drive se image, PDF, document, video, audio ya supported file select kar sakte hain.</div>
 {% endif %}
 </div>
-<div class="button-row"><button type="submit" class="primary">💾 Save Campaign</button></div>
+<div class="button-row"><button type="submit" class="btn primary">💾 Save Campaign</button></div>
+</div>
 </form>
 </div>
-<div class="card">
-<h2>Campaigns</h2>
+
+<div class="table-card">
+<h2>Campaigns</h2><p class="muted" style="margin-top:0">Saved campaigns and their current status.</p>
 <div class="campaign-table-wrapper"><table>
 <thead><tr><th>Campaign Name</th><th>Target</th><th>Message</th><th>Attachment</th><th>Status</th><th>Action</th></tr></thead>
 <tbody>
@@ -63,20 +78,21 @@
 <td><strong>{{ row.name }}</strong>{% if row.created_at %}<div class="hint">{{ row.created_at }}</div>{% endif %}</td>
 <td>{% if row.target_type == 'single' %}📱 {{ row.target_phone }}{% elif row.group_name and row.group_name.startswith('__SINGLE__:') %}📱 {{ row.group_name.replace('__SINGLE__:', '') }}{% else %}👥 {{ row.group_name or '—' }}{% endif %}</td>
 <td><div class="message-preview">{% if row.message %}{{ row.message }}{% else %}<span class="hint">No message</span>{% endif %}</div></td>
-<td>{% if row.drive_file_name %}📎<div class="attachment-name">{{ row.drive_file_name }}</div>{% elif row.drive_file_id %}📎 Attachment{% else %}<span class="hint">No attachment</span>{% endif %}</td>
+<td>{% if row.drive_file_name %}📎 <div class="attachment-name">{{ row.drive_file_name }}</div>{% elif row.drive_file_id %}📎 Attachment{% else %}<span class="hint">No attachment</span>{% endif %}</td>
 <td>{% set status=(row.status or 'Draft')|lower %}{% if status == 'failed' %}<span class="status failed">Failed</span>{% elif status == 'partial' %}<span class="status partial">Partial</span>{% elif status == 'draft' %}<span class="status draft">Draft</span>{% else %}<span class="status">{{ row.status or 'Draft' }}</span>{% endif %}</td>
-<td><div class="actions"><form method="POST" action="{{ url_for('send_campaign', cid=row.id) }}" onsubmit="return confirm('Send this campaign now?');"><button type="submit" class="send">Send</button></form><form method="POST" action="{{ url_for('delete_campaign', cid=row.id) }}" onsubmit="return confirm('Delete this campaign?');"><button type="submit" class="danger">Delete</button></form></div></td>
+<td><div class="actions"><form method="POST" action="{{ url_for('send_campaign', cid=row.id) }}" onsubmit="return confirm('Send this campaign now?');"><button type="submit" class="btn send">Send</button></form><form method="POST" action="{{ url_for('delete_campaign', cid=row.id) }}" onsubmit="return confirm('Delete this campaign?');"><button type="submit" class="btn danger">Delete</button></form></div></td>
 </tr>
 {% endfor %}
 {% else %}<tr><td colspan="6" class="empty">No campaigns found.</td></tr>{% endif %}
 </tbody></table></div>
 </div>
-</div>
 {% endblock %}
-{% block scripts %}<script>
-function changeCampaignType(){const s=document.getElementById('singleRadio'),g=document.getElementById('groupRadio'),sb=document.getElementById('singleBox'),gb=document.getElementById('groupBox');if(s.checked){sb.style.display='block';gb.style.display='none';document.getElementById('group_name').value='';changeSingleMode()}else{sb.style.display='none';gb.style.display='block';document.getElementById('single_number').value='';document.getElementById('manual_number').value='';}}
+
+{% block scripts %}
+<script>
+function changeCampaignType(){const s=document.getElementById('singleRadio'),sb=document.getElementById('singleBox'),gb=document.getElementById('groupBox');if(s.checked){sb.style.display='block';gb.style.display='none';document.getElementById('group_name').value='';changeSingleMode()}else{sb.style.display='none';gb.style.display='block';document.getElementById('single_number').value='';document.getElementById('manual_number').value=''}}
 function changeSingleMode(){const m=document.getElementById('target_mode').value,a=document.getElementById('savedContactBox'),b=document.getElementById('manualBox');if(m==='manual'){a.style.display='none';b.style.display='block';document.getElementById('single_number').value=''}else{a.style.display='block';b.style.display='none';document.getElementById('manual_number').value=''}}
 function selectDriveFile(){const s=document.getElementById('drive_file_id');if(!s)return;const o=s.options[s.selectedIndex],n=document.getElementById('drive_file_name'),m=document.getElementById('drive_mime_type'),d=document.getElementById('selectedFile');if(!o||!o.value){n.value='';m.value='';d.style.display='none';d.textContent='';return}n.value=o.dataset.name||'';m.value=o.dataset.mime||'';d.textContent='📎 Selected: '+(o.dataset.name||'');d.style.display='block'}
-document.addEventListener('DOMContentLoaded',function(){changeCampaignType();selectDriveFile()});
-document.getElementById('campaignForm').addEventListener('submit',function(e){if(document.getElementById('singleRadio').checked){const m=document.getElementById('target_mode').value;if(m==='saved'&&!document.getElementById('single_number').value.trim()){alert('Please select a saved contact.');e.preventDefault();return false}if(m==='manual'&&!document.getElementById('manual_number').value.trim()){alert('Please enter a WhatsApp number.');e.preventDefault();return false}}return true});
-</script>{% endblock %}
+document.addEventListener('DOMContentLoaded',function(){changeCampaignType();selectDriveFile();const form=document.getElementById('campaignForm');if(form)form.addEventListener('submit',function(e){if(document.getElementById('singleRadio').checked){const m=document.getElementById('target_mode').value;if(m==='saved'&&!document.getElementById('single_number').value.trim()){alert('Please select a saved contact.');e.preventDefault();return false}if(m==='manual'&&!document.getElementById('manual_number').value.trim()){alert('Please enter a WhatsApp number.');e.preventDefault();return false}}return true})});
+</script>
+{% endblock %}
