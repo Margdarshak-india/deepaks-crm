@@ -1,28 +1,67 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{% block title %}Deepak's CRM{% endblock %}</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Margdarshak's CRM{% endblock %}</title>
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f7fb;color:#172033}
-.sidebar{position:fixed;inset:0 auto 0 0;width:245px;background:#0f172a;color:#fff;padding:20px 14px;overflow-y:auto}.brand{font-weight:700;font-size:18px;padding:10px 12px 24px;border-bottom:1px solid #334155;margin-bottom:18px}.nav a{display:block;color:#cbd5e1;text-decoration:none;padding:11px 12px;border-radius:9px;margin:4px 0;font-size:14px}.nav a:hover,.nav a.active{background:#2563eb;color:#fff}
-.main{margin-left:245px;min-height:100vh}.topbar{height:68px;background:#fff;border-bottom:1px solid #e5e7eb;padding:0 30px;display:flex;align-items:center;justify-content:space-between;gap:15px}.crumb{color:#64748b;font-size:14px}.crumb strong{color:#172033}.top-actions{display:flex;gap:8px}.content{padding:28px 30px;max-width:1450px;margin:auto}.heading{margin-bottom:20px}.heading h1{margin:0;font-size:28px;color:#172033}.heading p{color:#64748b;margin:6px 0 0}.card,.table-card,.panel{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px;box-shadow:0 3px 12px #00000008;margin-bottom:20px}h2{font-size:18px;margin:0 0 8px;color:#172b4d}.muted{color:#64748b;font-size:13px}label{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}input,select,textarea{width:100%;padding:10px;border:1px solid #dbe2ea;border-radius:8px;background:#fff;font:inherit}input:focus,select:focus,textarea:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px #2563eb18}textarea{min-height:130px;resize:vertical}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.btn{display:inline-block;border:0;border-radius:8px;padding:10px 14px;font-weight:600;text-decoration:none;cursor:pointer;font-size:13px}.blue{background:#2563eb;color:#fff}.green{background:#16a34a;color:#fff}.gray{background:#475569;color:#fff}.red{background:#dc2626;color:#fff}.disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed}.full{width:100%;text-align:center}.flash{padding:11px 13px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;color:#065f46;margin-bottom:15px;font-size:13px}.alert{padding:11px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#1e40af;font-size:13px;margin:14px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:720px}th,td{padding:12px 14px;border-bottom:1px solid #eef2f7;text-align:left;font-size:13px;vertical-align:top}th{background:#f8fafc;font-size:12px;color:#475569;white-space:nowrap}.empty{text-align:center;padding:30px;color:#64748b}.status{display:inline-block;padding:5px 9px;border-radius:20px;font-size:11px;font-weight:700;background:#e2e8f0;color:#475569}.approved,.accepted{background:#dcfce7;color:#166534}.pending{background:#fef3c7;color:#92400e}.rejected,.failed{background:#fee2e2;color:#991b1b}.partial{background:#fff4d8;color:#9a6b00}.actions{display:flex;gap:7px;flex-wrap:wrap}.actions form{margin:0}.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.stat{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:18px;box-shadow:0 3px 12px #00000008}.stat .label{font-size:13px;color:#64748b}.stat .num{font-size:28px;font-weight:800;color:#2563eb;margin-top:7px}.message-preview{max-width:300px;white-space:pre-wrap;word-break:break-word}.campaign-type{display:flex;gap:25px;align-items:center;margin:12px 0 5px}.campaign-type label{margin:0;font-weight:normal;display:flex;align-items:center;gap:7px;cursor:pointer}.campaign-type input{width:auto}.target-box,.single-mode,.manual-box,.saved-contact-box{margin-top:12px}.hint{font-size:13px;color:#64748b;margin-top:5px}.attachment-box{margin-top:20px;padding:18px;border:1px solid #dce5ed;border-radius:10px;background:#f8fbfd}.attachment-header{font-weight:bold;color:#334155;margin-bottom:10px}.drive-status{margin-top:8px;font-size:13px;color:#168044;font-weight:bold}.selected-file{margin-top:10px;padding:10px;border-radius:7px;background:#e9f7ff;color:#0879ad;display:none;word-break:break-word}.button-row{margin-top:22px;display:flex;gap:10px;flex-wrap:wrap}.send{background:#12a6b8;color:#fff}.danger{background:#e83e8c;color:#fff}.required{color:red}.campaign-table-wrapper{overflow-x:auto}.manual-note{padding:10px 12px;margin-top:10px;background:#fff8e5;border:1px solid #f0dfaa;border-radius:7px;color:#765d00;font-size:13px}.top-links{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}.top-links a{text-decoration:none;padding:8px 13px;border-radius:7px;background:#eef6fb;color:#168bc4;font-size:13px;font-weight:bold}.error{color:#b91c1c;max-width:360px;word-break:break-word}.created{white-space:nowrap}.template-preview{margin-top:12px;padding:12px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;font-size:13px;white-space:pre-wrap;color:#334155}.variable-box{margin-top:14px;padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px}.variable-title{font-size:13px;font-weight:700;color:#334155;margin-bottom:8px}.variable-help{font-size:12px;color:#64748b;margin-top:8px}.no-vars{font-size:13px;color:#166534;background:#ecfdf5;border:1px solid #bbf7d0;padding:10px;border-radius:8px}.notice{padding:12px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;color:#475569;font-size:13px}
-@media(max-width:900px){.sidebar{position:static;width:100%;min-height:auto}.main{margin-left:0}.nav{display:grid;grid-template-columns:repeat(2,1fr);gap:3px}.nav a{margin:2px}.topbar{padding:0 15px}.content{padding:20px 15px}.grid,.row{grid-template-columns:1fr}.stat-grid{grid-template-columns:1fr 1fr}}
-@media(max-width:520px){.stat-grid{grid-template-columns:1fr}.topbar{height:auto;padding:14px 15px;align-items:flex-start;flex-direction:column}}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f7fb;color:#172033}
+a{text-decoration:none;color:inherit}
+.sidebar{position:fixed;left:-290px;top:0;bottom:0;width:270px;background:#0d172b;color:#dbe5f4;padding:24px 15px;overflow-y:auto;z-index:1001;transition:left .22s ease;box-shadow:8px 0 28px rgba(0,0,0,.18)}
+.sidebar.open{left:0}
+.brand{font-size:21px;font-weight:700;color:#fff;padding:0 14px 22px;border-bottom:1px solid #26334a;margin-bottom:20px}
+.nav{display:flex;flex-direction:column;gap:6px}.nav a{display:block;padding:12px 13px;border-radius:9px;font-size:14px;transition:.15s}.nav a:hover{background:#182844;color:#fff}.nav a.active{background:#2563eb;color:#fff}
+.menu-overlay{position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:1000;display:none}.menu-overlay.show{display:block}
+.main{margin-left:0;min-height:100vh}.topbar{height:68px;background:#fff;border-bottom:1px solid #e5e7eb;padding:0 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:900}
+.menu-btn{width:42px;height:42px;border:0;border-radius:10px;background:#0d172b;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;flex:none}.menu-btn span{display:block;width:19px;height:2px;background:#fff;border-radius:2px}
+.breadcrumb{font-size:14px;color:#64748b}.breadcrumb strong{color:#172033}.top-actions{display:none}
+.close-menu{position:absolute;right:12px;top:12px;width:36px;height:36px;border:0;border-radius:8px;background:#182844;color:#fff;font-size:22px;cursor:pointer}
+.content{padding:28px 30px;max-width:1450px;margin:auto}.heading{margin-bottom:20px}.heading h1{margin:0;font-size:30px}.heading p{margin:8px 0 0;color:#64748b}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}.card,.table-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px;box-shadow:0 3px 12px #00000008;margin-bottom:20px}.stat{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:22px;box-shadow:0 3px 12px #00000008}.stat .label{color:#64748b;font-size:14px}.stat .num{font-size:40px;font-weight:700;color:#2563eb;margin-top:12px}
+h2{font-size:18px;margin:0 0 8px}.muted{color:#64748b;font-size:13px}label{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}input,select,textarea{width:100%;padding:11px 12px;border:1px solid #dbe2ea;border-radius:8px;background:#fff;font:inherit}input:focus,select:focus,textarea:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px #2563eb18}input[readonly]{background:#f8fafc;color:#475569}textarea{min-height:140px;resize:vertical}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn{display:inline-block;border:0;border-radius:8px;padding:10px 14px;font-weight:600;text-decoration:none;cursor:pointer;font-size:14px}.blue{background:#2563eb;color:#fff}.green{background:#16a34a;color:#fff}.gray{background:#475569;color:#fff}.red{background:#ef4444;color:#fff}.disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed}.full{width:100%;text-align:center;margin-top:12px}
+.alert{padding:11px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#1e40af;font-size:13px;margin:14px 0}.flash{padding:11px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;color:#065f46;margin-bottom:15px;font-size:13px}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:720px}th,td{padding:12px 14px;border-bottom:1px solid #eef2f7;text-align:left;font-size:13px;vertical-align:top}th{background:#f8fafc;font-size:12px;color:#475569}.empty{text-align:center;color:#64748b;padding:24px}.status{display:inline-block;padding:5px 9px;border-radius:20px;font-size:11px;font-weight:700;background:#e2e8f0;color:#334155}.approved{background:#dcfce7;color:#166534}.pending{background:#fef3c7;color:#92400e}.rejected,.failed{background:#fee2e2;color:#991b1b}.accepted{background:#dcfce7;color:#166534}.message-preview{max-width:420px;white-space:pre-wrap;word-break:break-word}.error{color:#b91c1c;max-width:300px;word-break:break-word}.created{white-space:nowrap}.actions{display:flex;gap:7px;flex-wrap:wrap}.actions form{margin:0}.health-row{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px 0;border-bottom:1px solid #eef2f7}.health-row:last-child{border-bottom:0}.health-name{font-weight:600}.ok{color:#15803d}.bad{color:#b91c1c}pre{white-space:pre-wrap;word-break:break-word}
+@media(max-width:1000px){.stat-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:850px){.grid,.row{grid-template-columns:1fr}.topbar{padding:12px 15px}.content{padding:20px 15px}}
+@media(max-width:520px){.stat-grid{grid-template-columns:1fr}.heading h1{font-size:26px}.breadcrumb{font-size:13px}}
 </style>
 {% block head %}{% endblock %}
-</head><body>
-<aside class="sidebar"><div class="brand">📱 Deepak's CRM</div><nav class="nav">
-<a href="{{ url_for('dashboard') }}" class="{% if request.endpoint=='dashboard' %}active{% endif %}">⌂ Dashboard</a>
-<a href="{{ url_for('contacts') }}" class="{% if request.endpoint in ['contacts','delete_contact','delete_selected_contacts','delete_all_contacts'] %}active{% endif %}">👥 Contacts</a>
-<a href="{{ url_for('campaigns') }}" class="{% if request.endpoint in ['campaigns','send_campaign','delete_campaign'] %}active{% endif %}">📣 Campaigns</a>
-<a href="{{ url_for('template_campaigns') }}" class="{% if request.endpoint in ['template_campaigns','send_template_campaign','delete_template_campaign'] %}active{% endif %}">🧩 Template Campaign</a>
-<a href="{{ url_for('messages') }}" class="{% if request.endpoint=='messages' %}active{% endif %}">💬 Messages</a>
-<a href="{{ url_for('google_drive') }}" class="{% if request.endpoint in ['google_drive','google_login','google_logout','google_drive_import'] %}active{% endif %}">☁ Google Drive</a>
-<a href="{{ url_for('incoming') }}" class="{% if request.endpoint=='incoming' %}active{% endif %}">📥 Incoming</a>
-<a href="{{ url_for('webhook_logs') }}" class="{% if request.endpoint=='webhook_logs' %}active{% endif %}">⚡ Webhook Logs</a>
-<a href="{{ url_for('settings') }}" class="{% if request.endpoint=='settings' %}active{% endif %}">⚙ Settings</a>
-</nav></aside>
-<main class="main"><header class="topbar"><div class="crumb">Deepak's CRM / <strong>{% block page_name %}Dashboard{% endblock %}</strong></div><div class="top-actions"><a class="btn gray" href="{{ url_for('campaigns') }}">Normal Campaign</a><a class="btn blue" href="{{ url_for('template_campaigns') }}">Template Campaign</a></div></header>
-<section class="content">{% with messages=get_flashed_messages() %}{% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}{% endwith %}{% block content %}{% endblock %}</section></main>
-{% block scripts %}{% endblock %}</body></html>
+</head>
+<body>
+<div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
+<aside class="sidebar" id="crmMenu" aria-hidden="true">
+<button class="close-menu" type="button" onclick="closeMenu()" aria-label="Close menu">×</button>
+<div class="brand">📱 Margdarshak's CRM</div>
+<nav class="nav">
+<a href="{{ url_for('dashboard') }}" class="{% if page_name=='Dashboard' %}active{% endif %}">⌂ Dashboard</a>
+<a href="{{ url_for('contacts') }}" class="{% if page_name=='Contacts' %}active{% endif %}">👥 Contacts</a>
+<a href="{{ url_for('campaigns') }}" class="{% if page_name=='Campaigns' %}active{% endif %}">📣 Campaigns</a>
+<a href="{{ url_for('template_campaigns') }}" class="{% if page_name=='Template Campaign' %}active{% endif %}">🧩 Template Campaign</a>
+<a href="{{ url_for('messages') }}" class="{% if page_name=='Messages' %}active{% endif %}">💬 Messages</a>
+<a href="{{ url_for('incoming') }}" class="{% if page_name=='Incoming' %}active{% endif %}">📥 Incoming</a>
+<a href="{{ url_for('google_drive') }}" class="{% if page_name=='Google Drive' %}active{% endif %}">📁 Google Drive</a>
+<a href="{{ url_for('settings') }}" class="{% if page_name=='Settings' %}active{% endif %}">⚙ Settings</a>
+<a href="{{ url_for('privacy') }}" class="{% if page_name=='Privacy' %}active{% endif %}">🔒 Privacy</a>
+</nav>
+</aside>
+<main class="main">
+<header class="topbar">
+<button class="menu-btn" type="button" onclick="toggleMenu()" aria-label="Open navigation" aria-expanded="false" id="menuButton"><span></span><span></span><span></span></button>
+<div class="breadcrumb">Margdarshak's CRM / <strong>{{ page_name|default('CRM') }}</strong></div>
+</header>
+<section class="content">
+{% with messages=get_flashed_messages() %}{% for message in messages %}<div class="flash">{{ message }}</div>{% endfor %}{% endwith %}
+{% block content %}{% endblock %}
+</section>
+</main>
+<script>
+function openMenu(){document.getElementById('crmMenu').classList.add('open');document.getElementById('menuOverlay').classList.add('show');document.getElementById('crmMenu').setAttribute('aria-hidden','false');document.getElementById('menuButton').setAttribute('aria-expanded','true');}
+function closeMenu(){document.getElementById('crmMenu').classList.remove('open');document.getElementById('menuOverlay').classList.remove('show');document.getElementById('crmMenu').setAttribute('aria-hidden','true');document.getElementById('menuButton').setAttribute('aria-expanded','false');}
+function toggleMenu(){document.getElementById('crmMenu').classList.contains('open')?closeMenu():openMenu();}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeMenu();});
+document.querySelectorAll('.nav a').forEach(function(a){a.addEventListener('click',closeMenu);});
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
