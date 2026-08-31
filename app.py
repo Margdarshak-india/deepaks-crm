@@ -3393,6 +3393,7 @@ def debug_templates():
 # =========================================================
 
 def fetch_meta_templates():
+    import re
     """Fetch all WhatsApp message templates from the configured WABA."""
     token = get_env("WHATSAPP_ACCESS_TOKEN")
     waba_id = (
