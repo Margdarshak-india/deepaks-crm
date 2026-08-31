@@ -1,25 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - Margdarshak's CRM{% endblock %}{% block page_name %}Dashboard{% endblock %}
+{% block title %}Dashboard - Margdarshak's CRM{% endblock %}
+{% block page_name %}Dashboard{% endblock %}
 {% block content %}
 <div class="heading"><h1>Dashboard</h1><p>WhatsApp CRM overview and campaign activity.</p></div>
-<div class="stat-grid">
-<div class="stat"><div class="label">Contacts</div><div class="num">{{ contacts }}</div></div>
-<div class="stat"><div class="label">Campaigns</div><div class="num">{{ campaigns }}</div></div>
-<div class="stat"><div class="label">Messages Sent</div><div class="num">{{ sent }}</div></div>
-<div class="stat"><div class="label">Delivered</div><div class="num">{{ delivered }}</div></div>
-<div class="stat"><div class="label">Failed</div><div class="num">{{ failed }}</div></div>
-<div class="stat"><div class="label">Read</div><div class="num">{{ read }}</div></div>
+<div class="grid-4">
+<div class="card stat"><div class="stat-icon">👥</div><div class="stat-label">Contacts</div><div class="stat-value">{{ contacts }}</div></div>
+<div class="card stat"><div class="stat-icon">📣</div><div class="stat-label">Campaigns</div><div class="stat-value">{{ campaigns }}</div></div>
+<div class="card stat"><div class="stat-icon">📤</div><div class="stat-label">Messages Sent</div><div class="stat-value">{{ sent }}</div></div>
+<div class="card stat"><div class="stat-icon">✅</div><div class="stat-label">Delivered</div><div class="stat-value">{{ delivered }}</div></div>
 </div>
-<div class="grid" style="margin-top:18px">
-<div class="card"><h2>System Status</h2>
-<div class="health-row"><span class="health-name">WhatsApp Cloud API</span><span class="status {% if whatsapp_ok %}approved{% else %}failed{% endif %}">{{ 'Connected' if whatsapp_ok else 'Not Configured' }}</span></div>
-<div class="health-row"><span class="health-name">Google Drive</span><span class="status {% if google_connected %}approved{% else %}pending{% endif %}">{{ 'Connected' if google_connected else 'Not Connected' }}</span></div>
-</div>
-<div class="card"><h2>Quick Actions</h2><div class="actions" style="margin-top:14px"><a class="btn blue" href="{{ url_for('contacts') }}">Manage Contacts</a><a class="btn gray" href="{{ url_for('campaigns') }}">Normal Campaign</a><a class="btn green" href="{{ url_for('template_campaigns') }}">Template Campaign</a></div></div>
-</div>
-<div class="table-card"><h2>Recent Campaigns</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>Target</th><th>Message</th><th>Status</th></tr></thead><tbody>
-{% for r in recent %}
-<tr><td><strong>{{ r.name }}</strong><div class="muted">{{ r.created_at }}</div></td><td>{% if r.group_name and r.group_name.startswith('__SINGLE__:') %}📱 {{ r.group_name.replace('__SINGLE__:', '') }}{% else %}👥 {{ r.group_name or 'All Contacts' }}{% endif %}</td><td class="message-preview">{{ r.message }}</td><td><span class="status {% if (r.status or '')|lower=='failed' %}failed{% elif (r.status or '')|lower in ['sent','delivered','read','accepted'] %}accepted{% endif %}">{{ r.status or 'Draft' }}</span></td></tr>
-{% else %}<tr><td colspan="4" class="empty">No campaigns.</td></tr>{% endfor %}
-</tbody></table></div></div>
+<div class="card"><h2>Recent Campaigns</h2><p class="muted">Your latest messaging activity.</p><div class="table-wrap"><table><thead><tr><th>Name</th><th>Group / Target</th><th>Status</th></tr></thead><tbody>{% for r in recent %}<tr><td><strong>{{ r.name }}</strong></td><td>{{ r.group_name or 'All Contacts' }}</td><td><span class="badge {% if 'failed' in (r.status or '')|lower %}danger{% elif 'accepted' in (r.status or '')|lower %}success{% else %}neutral{% endif %}">{{ r.status }}</span></td></tr>{% else %}<tr><td colspan="3" class="empty">No campaigns created yet.</td></tr>{% endfor %}</tbody></table></div></div>
 {% endblock %}
