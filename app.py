@@ -220,6 +220,7 @@ def init_db():
         c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS header_media_id TEXT")
         c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS header_media_path TEXT")
         c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS header_media_type TEXT")
+        c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS selected_contact_ids TEXT")
 
         c.commit()
 
@@ -3539,13 +3540,30 @@ def fetch_meta_templates():
 
 
 def template_campaign_recipients(campaign):
-    if campaign["target_type"] == "single":
+    target_type = campaign["target_type"]
+
+    if target_type == "single":
         phone = clean_phone(campaign["manual_number"] or "")
         return [{"id": None, "name": "Customer", "phone": phone}] if phone else []
 
     c = db()
     try:
-        if campaign["target_type"] == "all":
+        if target_type == "selected":
+            raw_ids = campaign.get("selected_contact_ids") or ""
+            try:
+                ids = [int(x) for x in json.loads(raw_ids)] if raw_ids else []
+            except Exception:
+                ids = []
+            ids = list(dict.fromkeys(ids))
+            if not ids:
+                return []
+            placeholders = ",".join(["?"] * len(ids))
+            return c.execute(
+                f"SELECT * FROM contacts WHERE id IN ({placeholders}) ORDER BY id ASC",
+                tuple(ids)
+            ).fetchall()
+
+        if target_type == "all":
             return c.execute("SELECT * FROM contacts ORDER BY id ASC").fetchall()
 
         return c.execute(
@@ -3599,6 +3617,12 @@ def template_campaigns():
         group_name = request.form.get("group_name", "").strip()
         manual_number = clean_phone(request.form.get("manual_number", ""))
         parameters = request.form.get("parameters", "").strip()
+        selected_contact_ids_raw = request.form.get("selected_contact_ids", "").strip()
+        try:
+            selected_contact_ids = [int(x) for x in json.loads(selected_contact_ids_raw)] if selected_contact_ids_raw else []
+        except Exception:
+            selected_contact_ids = []
+        selected_contact_ids = list(dict.fromkeys(selected_contact_ids))
 
         selected = next(
             (
@@ -3678,14 +3702,19 @@ def template_campaigns():
             flash("Please enter a WhatsApp number.")
             return redirect(url_for("template_campaigns"))
 
+        if target_type == "selected" and not selected_contact_ids:
+            flash("Please select at least one contact.")
+            return redirect(url_for("template_campaigns"))
+
         c = db()
         try:
             c.execute("""
                 INSERT INTO template_campaigns
                 (name, template_name, template_language, target_type,
                  group_name, manual_number, parameters, status,
-                 header_image_path, header_media_path, header_media_type)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 header_image_path, header_media_path, header_media_type,
+                 selected_contact_ids)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 name,
                 template_name,
@@ -3697,7 +3726,8 @@ def template_campaigns():
                 "Approved",
                 header_media_path if header_media_type == "image" else None,
                 header_media_path or None,
-                header_media_type or None
+                header_media_type or None,
+                json.dumps(selected_contact_ids) if selected_contact_ids else None
             ))
             c.commit()
             flash("Template campaign saved. Send Campaign is enabled.")
@@ -3724,6 +3754,10 @@ def template_campaigns():
                 ORDER BY group_name
             """).fetchall()
         ]
+
+        contacts = c.execute(
+            "SELECT id, name, phone, group_name FROM contacts ORDER BY name ASC, id ASC"
+        ).fetchall()
     finally:
         c.close()
 
@@ -3749,6 +3783,7 @@ def template_campaigns():
         campaigns=campaigns_list,
         templates=templates,
         groups=groups,
+        contacts=contacts,
         template_error=template_error,
         meta_template_url=meta_template_url
     )
