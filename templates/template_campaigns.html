@@ -1,274 +1,39 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Template Campaign - Deepak's CRM</title>
+{% extends "base.html" %}
+{% block title %}Template Campaign - Margdarshak's CRM{% endblock %}{% block page_name %}Template Campaign{% endblock %}
+{% block head %}
 <style>
-*{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f4f7fb;color:#172033}
-.sidebar{position:fixed;inset:0 auto 0 0;width:245px;background:#0f172a;color:#fff;padding:20px 14px}
-.brand{font-weight:700;font-size:18px;padding:10px 12px 24px;border-bottom:1px solid #334155;margin-bottom:18px}
-.nav a{display:block;color:#cbd5e1;text-decoration:none;padding:11px 12px;border-radius:9px;margin:4px 0;font-size:14px}
-.nav a:hover,.nav a.active{background:#2563eb;color:#fff}
-.main{margin-left:245px;min-height:100vh}
-.topbar{height:68px;background:#fff;border-bottom:1px solid #e5e7eb;padding:0 30px;display:flex;align-items:center;justify-content:space-between}
-.content{padding:28px 30px;max-width:1450px;margin:auto}
-.heading{margin-bottom:20px}.heading h1{margin:0;font-size:28px}.heading p{color:#64748b}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.card,.table-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px;box-shadow:0 3px 12px #00000008;margin-bottom:20px}
-h2{font-size:18px;margin:0 0 8px}.muted{color:#64748b;font-size:13px}
-label{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}
-input,select{width:100%;padding:10px;border:1px solid #dbe2ea;border-radius:8px;background:#fff}
-input[readonly]{background:#f8fafc;color:#475569}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.btn{display:inline-block;border:0;border-radius:8px;padding:10px 14px;font-weight:600;text-decoration:none;cursor:pointer}
-.blue{background:#2563eb;color:#fff}.green{background:#16a34a;color:#fff}.gray{background:#475569;color:#fff}.disabled{background:#cbd5e1;color:#64748b}
-.full{width:100%;text-align:center;margin-top:12px}
-.alert{padding:11px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#1e40af;font-size:13px;margin:14px 0}
-.flash{padding:11px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;color:#065f46;margin-bottom:15px;font-size:13px}
-.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:720px}
-th,td{padding:12px 14px;border-bottom:1px solid #eef2f7;text-align:left;font-size:13px}
-th{background:#f8fafc;font-size:12px;color:#475569}
-.status{padding:5px 9px;border-radius:20px;font-size:11px;font-weight:700}
-.approved{background:#dcfce7;color:#166534}.pending{background:#fef3c7;color:#92400e}.rejected{background:#fee2e2;color:#991b1b} .btn.red{background:#ef4444;color:#fff}
-.template-preview{margin-top:12px;padding:12px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;font-size:13px;white-space:pre-wrap;color:#334155}
-.variable-box{margin-top:14px;padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px}
-.variable-title{font-size:13px;font-weight:700;color:#334155;margin-bottom:8px}
-.variable-help{font-size:12px;color:#64748b;margin-top:8px}
-.no-vars{font-size:13px;color:#166534;background:#ecfdf5;border:1px solid #bbf7d0;padding:10px;border-radius:8px}
-@media(max-width:850px){.sidebar{position:static;width:100%;min-height:auto}.main{margin-left:0}.grid,.row{grid-template-columns:1fr}.topbar{padding:0 15px}.content{padding:20px 15px}}
+.template-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.template-preview{margin-top:12px;padding:12px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;font-size:13px;white-space:pre-wrap;color:#334155}.variable-box{margin-top:14px;padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px}.variable-title{font-size:13px;font-weight:700;color:#334155;margin-bottom:8px}.variable-help{font-size:12px;color:#64748b;margin-top:8px}.no-vars{font-size:13px;color:#166534;background:#ecfdf5;border:1px solid #bbf7d0;padding:10px;border-radius:8px}
+@media(max-width:850px){.template-grid{grid-template-columns:1fr}}
 </style>
-</head>
-<body>
-<aside class="sidebar">
-<div class="brand">📱 Deepak's CRM</div>
-<nav class="nav">
-<a href="/">⌂ Dashboard</a>
-<a href="/contacts">👥 Contacts</a>
-<a href="/campaigns">📣 Campaigns</a>
-<a href="/template-campaigns" class="active">🧩 Template Campaign</a>
-<a href="/messages">💬 Messages</a>
-<a href="/incoming">📥 Incoming</a>
-<a href="/webhook/logs">⚡ Webhook Logs</a>
-<a href="/settings">⚙ Settings</a>
-</nav>
-</aside>
-
-<main class="main">
-<header class="topbar">
-<span>Deepak's CRM / <strong>Template Campaign</strong></span>
-<a class="btn gray" href="/campaigns">Normal Campaign</a>
-</header>
-
-<section class="content">
-<div class="heading">
-<h1>Template Campaign</h1>
-<p>Create, verify and send approved WhatsApp templates.</p>
+{% endblock %}
+{% block content %}
+<div class="heading"><h1>Template Campaign</h1><p>Create, verify and send approved WhatsApp templates.</p></div>
+{% if template_error %}<div class="alert">Meta template refresh error: {{ template_error }}</div>{% endif %}
+<div class="template-grid">
+<div class="card"><h2>1. Create Template in Meta</h2><p class="muted">Create or manage your template in Meta Business Manager. After approval, return here and refresh.</p><a class="btn blue full" href="{{ meta_template_url }}" target="_blank" rel="noopener">Open Meta Template Manager ↗</a></div>
+<div class="card"><h2>2. Refresh Templates</h2><p class="muted">CRM checks the templates available to your WhatsApp Business Account.</p><a class="btn gray full" href="{{ url_for('template_campaigns') }}">↻ Refresh Templates</a></div>
 </div>
-
-{% with messages=get_flashed_messages() %}
-{% for message in messages %}<div class="flash">{{ message }}</div>{% endfor %}
-{% endwith %}
-
-<div class="grid">
-<div class="card">
-<h2>1. Create Template in Meta</h2>
-<p class="muted">Create or manage the template in Meta Business Manager. After approval, return here and refresh.</p>
-<a class="btn blue full" href="{{ meta_template_url }}" target="_blank" rel="noopener">Open Meta Template Manager ↗</a>
-</div>
-
-<div class="card">
-<h2>2. Refresh Templates</h2>
-<p class="muted">CRM checks the templates available to your WhatsApp Business Account.</p>
-<a class="btn gray full" href="{{ url_for('template_campaigns') }}">↻ Refresh Templates</a>
-</div>
-</div>
-
-<div class="card">
-<h2>Create Template Campaign</h2>
-<div class="alert">Only <strong>APPROVED</strong> templates can be sent.</div>
-
-<form method="POST" action="{{ url_for('template_campaigns') }}" id="templateCampaignForm">
-<input type="hidden" name="action" value="create">
-
-<label>Campaign Name</label>
-<input name="name" placeholder="e.g. Admission 2026" required>
-
-<div class="row">
-<div>
-<label>Template</label>
-<select name="template_name" id="template_name" required onchange="templateChanged()">
-<option value="">-- Select Template --</option>
-{% for t in templates %}
-<option
-value="{{ t.name }}"
-data-lang="{{ t.language }}"
-data-status="{{ t.status }}"
-data-body="{{ t.body_text|e }}"
-data-variable-count="{{ t.variable_count }}"
-data-variables='{{ t.variables|tojson }}'>
-{{ t.name }} — {{ t.language }} — {{ t.status }}{% if t.variable_count %} — {{ t.variable_count }} variable{% if t.variable_count != 1 %}s{% endif %}{% endif %}
-</option>
-{% endfor %}
-</select>
-</div>
-
-<div>
-<label>Language</label>
-<input id="template_language" name="template_language" readonly>
-</div>
-</div>
-
+<div class="card"><h2>Create Template Campaign</h2><div class="alert">Only <strong>APPROVED</strong> templates can be sent.</div>
+<form method="POST" action="{{ url_for('template_campaigns') }}" id="templateCampaignForm"><input type="hidden" name="action" value="create">
+<label>Campaign Name</label><input name="name" placeholder="e.g. Admission 2026" required>
+<div class="row"><div><label>Template</label><select name="template_name" id="template_name" required onchange="templateChanged()"><option value="">-- Select Template --</option>{% for t in templates %}<option value="{{ t.name }}" data-lang="{{ t.language }}" data-status="{{ t.status }}" data-body="{{ t.body_text|e }}" data-variables='{{ t.variables|tojson }}'>{{ t.name }} — {{ t.language }} — {{ t.status }}{% if t.variable_count %} — {{ t.variable_count }} variable{% if t.variable_count != 1 %}s{% endif %}{% endif %}</option>{% endfor %}</select></div><div><label>Language</label><input id="template_language" name="template_language" readonly placeholder="Auto-filled from template"></div></div>
 <div id="templatePreview" class="template-preview" style="display:none"></div>
-
-<label>Target</label>
-<select name="target_type" id="target_type" onchange="targetChanged()">
-<option value="group">Contact Group</option>
-<option value="single">Single Number</option>
-<option value="all">All Contacts</option>
-</select>
-
-<div id="group">
-<label>Group</label>
-<select name="group_name">
-<option value="">-- Select Group --</option>
-{% for g in groups %}<option value="{{ g }}">{{ g }}</option>{% endfor %}
-</select>
-</div>
-
-<div id="single" style="display:none">
-<label>WhatsApp Number</label>
-<input name="manual_number" placeholder="919876543210">
-</div>
-
-<div class="variable-box">
-<div class="variable-title">Template Variables</div>
-<div id="variablesContainer">
-<div class="muted">Select a template to load its variables automatically.</div>
-</div>
-<input type="hidden" name="parameters" id="parameters">
-<div class="variable-help">Variable fields are created automatically from the selected Meta template. You do not need to edit this section manually for every new template.</div>
-</div>
-
-<button class="btn blue" type="submit" style="margin-top:16px">Save Template Campaign</button>
-</form>
-</div>
-
-<div class="table-card">
-<h2>Template Campaigns</h2>
-<div class="table-wrap">
-<table>
-<thead><tr><th>ID</th><th>Campaign</th><th>Template</th><th>Target</th><th>Status</th><th>Action</th><th>Delete</th></tr></thead>
-<tbody>
-{% for c in campaigns %}
-<tr>
-<td>{{ c.id }}</td>
-<td>{{ c.name }}</td>
-<td>{{ c.template_name }}<br>{{ c.template_language }}</td>
-<td>{{ c.target_type }}{% if c.group_name %} — {{ c.group_name }}{% endif %}</td>
-<td>
-<span class="status {% if c.status=='Approved' %}approved{% elif c.status=='Pending' %}pending{% elif c.status=='Rejected' %}rejected{% endif %}">{{ c.status }}</span>
-</td>
-<td>
-{% if c.status=='Approved' %}
-<form method="POST" action="{{ url_for('send_template_campaign',cid=c.id) }}" onsubmit="return confirm('Send this approved template campaign?')">
-<button class="btn green">Send Campaign</button>
-</form>
-{% else %}<span class="btn disabled">Send Disabled</span>{% endif %}
-</td>
-<td>
-<form method="POST" action="{{ url_for('delete_template_campaign',cid=c.id) }}" onsubmit="return confirm('Delete this template campaign? This cannot be undone.')">
-<button class="btn red" type="submit">Delete</button>
-</form>
-</td>
-</tr>
-{% else %}
-<tr><td colspan="7">No template campaigns yet.</td></tr>
-{% endfor %}
-</tbody>
-</table>
-</div>
-</div>
-</section>
-</main>
-
+<label>Target</label><select name="target_type" id="target_type" onchange="targetChanged()"><option value="group">Contact Group</option><option value="single">Single Number</option><option value="all">All Contacts</option></select>
+<div id="group"><label>Group</label><select name="group_name"><option value="">-- Select Group --</option>{% for g in groups %}<option value="{{ g }}">{{ g }}</option>{% endfor %}</select></div>
+<div id="single" style="display:none"><label>WhatsApp Number</label><input name="manual_number" placeholder="919876543210" inputmode="numeric"><div class="muted" style="margin-top:5px">Country code ke saath poora WhatsApp number dalein.</div></div>
+<div class="variable-box"><div class="variable-title">Template Variables</div><div id="variablesContainer"><div class="muted">Select a template to load its variables automatically.</div></div><input type="hidden" name="parameters" id="parameters"><div class="variable-help">Variables Meta template se automatically detect hote hain. New template banane par is section ko manually change karne ki zarurat nahi hai.</div></div>
+<button class="btn blue" type="submit" style="margin-top:16px">💾 Save Template Campaign</button>
+</form></div>
+<div class="table-card"><h2>Template Campaigns</h2><div class="table-wrap"><table><thead><tr><th>ID</th><th>Campaign</th><th>Template</th><th>Target</th><th>Status</th><th>Action</th><th>Delete</th></tr></thead><tbody>
+{% for c in campaigns %}<tr><td>{{ c.id }}</td><td><strong>{{ c.name }}</strong><div class="muted">{{ c.created_at }}</div></td><td>{{ c.template_name }}<br><span class="muted">{{ c.template_language }}</span></td><td>{% if c.target_type=='single' %}📱 {{ c.manual_number }}{% elif c.target_type=='all' %}👥 All Contacts{% else %}👥 {{ c.group_name or '—' }}{% endif %}</td><td><span class="status {% if c.status=='Approved' %}approved{% elif c.status=='Pending' %}pending{% elif c.status=='Rejected' %}rejected{% endif %}">{{ c.status }}</span></td><td>{% if c.status=='Approved' %}<form method="POST" action="{{ url_for('send_template_campaign',cid=c.id) }}" onsubmit="return confirm('Send this approved template campaign now?')"><button class="btn green" type="submit">Send Campaign</button></form>{% else %}<span class="btn disabled">Send Disabled</span>{% endif %}</td><td><form method="POST" action="{{ url_for('delete_template_campaign',cid=c.id) }}" onsubmit="return confirm('Delete this template campaign? This cannot be undone.')"><button class="btn red" type="submit">Delete</button></form></td></tr>
+{% else %}<tr><td colspan="7" class="empty">No template campaigns yet.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}
+{% block scripts %}
 <script>
-function templateChanged(){
-    const select = document.getElementById('template_name');
-    const option = select.options[select.selectedIndex];
-    const language = document.getElementById('template_language');
-    const preview = document.getElementById('templatePreview');
-    const container = document.getElementById('variablesContainer');
-    const parameters = document.getElementById('parameters');
-
-    container.innerHTML = '';
-    parameters.value = '';
-
-    if(!option || !option.value){
-        language.value = '';
-        preview.style.display = 'none';
-        container.innerHTML = '<div class="muted">Select a template to load its variables automatically.</div>';
-        return;
-    }
-
-    language.value = option.dataset.lang || '';
-
-    const body = option.dataset.body || '';
-    if(body){
-        preview.textContent = 'Template Body: ' + body;
-        preview.style.display = 'block';
-    }else{
-        preview.style.display = 'none';
-    }
-
-    let variables = [];
-    try {
-        variables = JSON.parse(option.dataset.variables || '[]');
-    } catch(e) {
-        variables = [];
-    }
-
-    if(!variables.length){
-        container.innerHTML = '<div class="no-vars">This template has no body variables. No values are required.</div>';
-        return;
-    }
-
-    variables.sort((a,b)=>Number(a)-Number(b));
-
-    variables.forEach(function(number){
-        const label = document.createElement('label');
-        label.textContent = 'Variable {{' + number + '}}';
-        label.style.marginTop = '10px';
-
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.className = 'template-variable-input';
-        input.dataset.number = number;
-        input.placeholder = 'Enter value for {{' + number + '}}';
-        input.required = true;
-        input.addEventListener('input', updateParameters);
-
-        container.appendChild(label);
-        container.appendChild(input);
-    });
-}
-
-function updateParameters(){
-    const inputs = Array.from(document.querySelectorAll('.template-variable-input'));
-    inputs.sort((a,b)=>Number(a.dataset.number)-Number(b.dataset.number));
-    document.getElementById('parameters').value = inputs.map(x=>x.value.trim()).join('||');
-}
-
-function targetChanged(){
-    const value = document.getElementById('target_type').value;
-    document.getElementById('group').style.display = value === 'group' ? 'block' : 'none';
-    document.getElementById('single').style.display = value === 'single' ? 'block' : 'none';
-}
-
-document.getElementById('templateCampaignForm').addEventListener('submit', function(){
-    updateParameters();
-});
+function templateChanged(){const s=document.getElementById('template_name'),o=s.options[s.selectedIndex],lang=document.getElementById('template_language'),preview=document.getElementById('templatePreview'),box=document.getElementById('variablesContainer'),params=document.getElementById('parameters');box.innerHTML='';params.value='';if(!o||!o.value){lang.value='';preview.style.display='none';box.innerHTML='<div class="muted">Select a template to load its variables automatically.</div>';return}lang.value=o.dataset.lang||'';const body=o.dataset.body||'';if(body){preview.textContent='Template Body: '+body;preview.style.display='block'}else{preview.style.display='none'}let vars=[];try{vars=JSON.parse(o.dataset.variables||'[]')}catch(e){vars=[]}if(!vars.length){box.innerHTML='<div class="no-vars">This template has no body variables. No values are required.</div>';return}vars.sort((a,b)=>Number(a)-Number(b));vars.forEach(function(n){const label=document.createElement('label');label.textContent='Variable {{'+n+'}}';label.style.marginTop='10px';const input=document.createElement('input');input.type='text';input.className='template-variable-input';input.dataset.number=n;input.placeholder='Enter value for {{'+n+'}}';input.required=true;input.addEventListener('input',updateParameters);box.appendChild(label);box.appendChild(input)})}
+function updateParameters(){const inputs=Array.from(document.querySelectorAll('.template-variable-input')).sort((a,b)=>Number(a.dataset.number)-Number(b.dataset.number));document.getElementById('parameters').value=inputs.map(x=>x.value.trim()).join('||')}
+function targetChanged(){const v=document.getElementById('target_type').value;document.getElementById('group').style.display=v==='group'?'block':'none';document.getElementById('single').style.display=v==='single'?'block':'none'}
+document.addEventListener('DOMContentLoaded',function(){targetChanged();document.getElementById('templateCampaignForm').addEventListener('submit',function(){updateParameters()})});
 </script>
-</body>
-</html>
+{% endblock %}
