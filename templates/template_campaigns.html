@@ -84,7 +84,7 @@
       <h2 id="mediaTitle" style="font-size:16px">📎 Header Media</h2>
 
       <div id="mediaHint" class="hint" style="margin-bottom:10px">
-        Upload media now if you want, or leave it blank. It will be required when you prepare/send the campaign.
+        Upload the media required by the selected Meta template header.
       </div>
 
       <input type="file"
@@ -141,7 +141,7 @@
 
       <div class="hint" style="margin-top:10px">
         You may leave these fields blank while saving the campaign.
-        If the Meta template contains variables, you can leave them blank here. They will be required on the final Send screen.
+        If the Meta template contains variables, all variable values must be filled before sending.
       </div>
     </div>
 
@@ -190,12 +190,8 @@
           </td>
           <td>
             {% if c.status=='Approved' %}
-            <form method="POST"
-                  action="{{ url_for('send_template_campaign',cid=c.id) }}"
-                  onsubmit="return confirm('Send this approved template campaign?')"
-                  style="display:inline-block;margin:0 4px 4px 0">
-              <a class="btn green" href="{{ url_for('send_template_campaign',cid=c.id) }}">📤 Prepare &amp; Send</a>
-            </form>
+              <button class="btn green" type="button"
+                      onclick="openSendModal({{ c.id }}, '{{ c.template_name|e }}', '{{ c.template_language|e }}', '{{ c.parameters|default('', true)|e }}')">📤 Send Campaign</button>
             {% else %}
               <span class="badge neutral">Send Disabled</span>
             {% endif %}
@@ -217,135 +213,124 @@
     </table>
   </div>
 </div>
+
+<!-- Inline Send Modal: stays on the same Template Campaigns page. -->
+<div id="sendModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this) closeSendModal()">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <div>
+        <h2 style="margin:0">📤 Send Template Campaign</h2>
+        <div id="sendTemplateTitle" class="hint" style="margin-top:4px"></div>
+      </div>
+      <button type="button" class="btn soft" onclick="closeSendModal()">✕</button>
+    </div>
+
+    <form id="sendForm" method="POST" enctype="multipart/form-data" style="margin-top:18px">
+      <div id="sendMediaBox" class="attachment-box" style="display:none">
+        <h3 id="sendMediaTitle" style="margin-top:0">Header Media</h3>
+        <div id="sendMediaHint" class="hint" style="margin-bottom:10px"></div>
+        <input id="send_header_media" name="header_media" type="file">
+        <div id="sendMediaPreview" style="margin-top:10px"></div>
+      </div>
+
+      <div id="sendVariablesBox" class="attachment-box" style="display:none;margin-top:14px">
+        <h3 style="margin-top:0">🔤 Template Variables</h3>
+        <div class="hint">Fill all variables before sending. These were optional while saving.</div>
+        <div id="sendVariablesContainer"></div>
+      </div>
+
+      <input type="hidden" name="parameters" id="send_parameters">
+
+      <div class="notice" style="margin-top:14px">
+        The campaign remains on this page. Media and variables are checked only when you press Send.
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn green" type="submit">📤 Send Now</button>
+        <button class="btn soft" type="button" onclick="closeSendModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
+<style>
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px}
+.modal-card{background:#fff;width:min(680px,100%);max-height:90vh;overflow:auto;border-radius:16px;padding:22px;box-shadow:0 18px 60px rgba(0,0,0,.25)}
+.modal-card input[type=file]{width:100%;box-sizing:border-box}
+</style>
 <script>
-function templateChanged() {
-  const s = document.getElementById('template_name');
-  const o = s.options[s.selectedIndex];
-  const lang = document.getElementById('template_language');
-  const p = document.getElementById('templatePreview');
-  const c = document.getElementById('variablesContainer');
-  const params = document.getElementById('parameters');
-  const mediaBox = document.getElementById('templateMediaBox');
-  const mediaTitle = document.getElementById('mediaTitle');
-  const mediaHint = document.getElementById('mediaHint');
-  const mediaInput = document.getElementById('header_media');
-  const mediaPreview = document.getElementById('mediaPreview');
+const META_TEMPLATES = {{ templates|tojson }};
+let activeSendTemplate = null;
 
-  c.innerHTML = '';
-  params.value = '';
-  mediaPreview.innerHTML = '';
-  mediaInput.value = '';
+function templateChanged(){
+  const s=document.getElementById('template_name'),o=s.options[s.selectedIndex],lang=document.getElementById('template_language'),p=document.getElementById('templatePreview'),c=document.getElementById('variablesContainer'),params=document.getElementById('parameters');
+  c.innerHTML='';params.value='';
+  if(!o||!o.value){lang.value='';p.style.display='none';c.innerHTML='<div class="muted">Select a template to load its variables automatically.</div>';return}
+  lang.value=o.dataset.lang||'';
+  const body=o.dataset.body||'';p.textContent=body?'Template Body: '+body:'';p.style.display=body?'block':'none';
+  let vars=[];try{vars=JSON.parse(o.dataset.variables||'[]')}catch(e){vars=[]}vars.sort((a,b)=>Number(a)-Number(b));
+  if(!vars.length){c.innerHTML='<div class="badge success">✓ No body variables</div>';return}
+  c.innerHTML='<div class="hint">These fields are optional while saving.</div>';
+  vars.forEach(n=>{const wrap=document.createElement('div');wrap.style.marginTop='12px';const label=document.createElement('label');label.textContent='Variable {{'+n+'}} (Optional)';const input=document.createElement('input');input.type='text';input.className='template-variable-input';input.dataset.number=n;input.placeholder='Enter value for {{'+n+'}} — optional';input.required=false;input.addEventListener('input',updateParameters);wrap.append(label,input);c.appendChild(wrap)})
+}
+function updateParameters(){const a=[...document.querySelectorAll('.template-variable-input')].sort((x,y)=>Number(x.dataset.number)-Number(y.dataset.number));document.getElementById('parameters').value=a.map(x=>x.value.trim()).join('||')}
+function targetChanged(){const v=document.getElementById('target_type').value;document.getElementById('group').style.display=v==='group'?'block':'none';document.getElementById('single').style.display=v==='single'?'block':'none'}
 
-  if (!o || !o.value) {
-    lang.value = '';
-    p.style.display = 'none';
-    mediaBox.style.display = 'none';
-    c.innerHTML = '<div class="muted">Select a template to load its variables automatically.</div>';
-    return;
-  }
+function findMetaTemplate(name,lang){return META_TEMPLATES.find(t=>t.name===name && t.language===lang)||null}
 
-  lang.value = o.dataset.lang || '';
+function openSendModal(cid,name,lang,savedParams){
+  activeSendTemplate=findMetaTemplate(name,lang);
+  if(!activeSendTemplate){alert('Template information could not be loaded. Please refresh templates.');return}
+  document.getElementById('sendForm').action='/template-campaign/'+cid+'/send';
+  document.getElementById('sendTemplateTitle').textContent=name+' — '+lang;
+  document.getElementById('send_parameters').value=savedParams||'';
 
-  const header = (o.dataset.header || '').toUpperCase();
+  const mediaBox=document.getElementById('sendMediaBox');
+  const mediaTitle=document.getElementById('sendMediaTitle');
+  const mediaHint=document.getElementById('sendMediaHint');
+  const mediaInput=document.getElementById('send_header_media');
+  const preview=document.getElementById('sendMediaPreview');
+  mediaInput.value='';preview.innerHTML='';
 
-  if (header === 'IMAGE' || header === 'VIDEO' || header === 'DOCUMENT') {
-    mediaBox.style.display = 'block';
+  const header=(activeSendTemplate.header_format||'').toUpperCase();
+  const type={IMAGE:'image',VIDEO:'video',DOCUMENT:'document'}[header]||'';
+  if(type){
+    mediaBox.style.display='block';
+    mediaTitle.textContent=header==='IMAGE'?'🖼️ Image Header':header==='VIDEO'?'🎬 Video Header':'📄 Document Header';
+    mediaHint.textContent='This '+header+' header is required when sending this template.';
+    mediaInput.accept=header==='IMAGE'?'image/jpeg,image/png':header==='VIDEO'?'video/mp4,video/3gpp':'.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt';
+    mediaInput.required=true;
+  } else {mediaBox.style.display='none';mediaInput.required=false}
 
-    if (header === 'IMAGE') {
-      mediaTitle.textContent = '🖼️ Image Header';
-      mediaHint.textContent = 'Upload the image used as the IMAGE header of this Meta template.';
-      mediaInput.accept = 'image/jpeg,image/png';
-    } else if (header === 'VIDEO') {
-      mediaTitle.textContent = '🎬 Video Header';
-      mediaHint.textContent = 'Upload the video used as the VIDEO header of this Meta template.';
-      mediaInput.accept = 'video/mp4,video/3gpp';
-    } else {
-      mediaTitle.textContent = '📄 Document Header';
-      mediaHint.textContent = 'Upload the document used as the DOCUMENT header of this Meta template.';
-      mediaInput.accept = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt';
-    }
-  } else {
-    mediaBox.style.display = 'none';
-  }
-
-  const body = o.dataset.body || '';
-  p.textContent = body ? 'Template Body: ' + body : '';
-  p.style.display = body ? 'block' : 'none';
-
-  let vars = [];
-  try {
-    vars = JSON.parse(o.dataset.variables || '[]');
-  } catch (e) {
-    vars = [];
-  }
-
-  vars.sort((a,b) => Number(a) - Number(b));
-
-  if (!vars.length) {
-    c.innerHTML = '<div class="badge success">✓ No body variables required</div>';
-    return;
-  }
-
-  c.innerHTML = '<div class="hint">These fields are optional while saving the campaign.</div>';
-
-  vars.forEach(n => {
-    const wrap = document.createElement('div');
-    wrap.style.marginTop = '12px';
-
-    const label = document.createElement('label');
-    label.textContent = 'Variable {{' + n + '}} (Optional)';
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'template-variable-input';
-    input.dataset.number = n;
-    input.placeholder = 'Enter value for {{' + n + '}} — optional';
-    input.required = false;
-    input.addEventListener('input', updateParameters);
-
-    wrap.append(label, input);
-    c.appendChild(wrap);
-  });
+  const box=document.getElementById('sendVariablesBox');
+  const vc=document.getElementById('sendVariablesContainer');vc.innerHTML='';
+  const vars=activeSendTemplate.variables||[];
+  if(vars.length){
+    box.style.display='block';
+    let old=(savedParams||'').split('||');
+    vars.forEach((n,i)=>{const wrap=document.createElement('div');wrap.style.marginTop='10px';const label=document.createElement('label');label.textContent='Variable {{'+n+'}}';const input=document.createElement('input');input.type='text';input.className='send-variable-input';input.dataset.number=n;input.value=(old[i]||'');input.placeholder='Required for sending';input.required=true;wrap.append(label,input);vc.appendChild(wrap)});
+  }else{box.style.display='none'}
+  document.getElementById('sendModal').style.display='flex';
 }
 
-function updateParameters() {
-  const a = [...document.querySelectorAll('.template-variable-input')]
-    .sort((x,y) => Number(x.dataset.number) - Number(y.dataset.number));
+function closeSendModal(){document.getElementById('sendModal').style.display='none'}
 
-  document.getElementById('parameters').value =
-    a.map(x => x.value.trim()).join('||');
-}
-
-function targetChanged() {
-  const v = document.getElementById('target_type').value;
-  document.getElementById('group').style.display = v === 'group' ? 'block' : 'none';
-  document.getElementById('single').style.display = v === 'single' ? 'block' : 'none';
-}
-
-document.getElementById('header_media')?.addEventListener('change', function() {
-  const file = this.files && this.files[0];
-  const preview = document.getElementById('mediaPreview');
-
-  preview.innerHTML = '';
-  if (!file) return;
-
-  const url = URL.createObjectURL(file);
-
-  if (file.type.startsWith('image/')) {
-    preview.innerHTML =
-      '<img src="' + url + '" style="max-width:260px;max-height:220px;border-radius:10px">';
-  } else if (file.type.startsWith('video/')) {
-    preview.innerHTML =
-      '<video src="' + url + '" controls style="max-width:360px;max-height:240px;border-radius:10px"></video>';
-  } else {
-    preview.innerHTML =
-      '<div class="badge success">📄 ' + file.name + '</div>';
-  }
+document.getElementById('sendForm').addEventListener('submit',function(e){
+  const vars=[...document.querySelectorAll('.send-variable-input')].sort((a,b)=>Number(a.dataset.number)-Number(b.dataset.number));
+  if(vars.some(x=>!x.value.trim())){e.preventDefault();alert('Please fill all template variables before sending.');return}
+  document.getElementById('send_parameters').value=vars.map(x=>x.value.trim()).join('||');
 });
 
-document.addEventListener('DOMContentLoaded', targetChanged);
+document.getElementById('send_header_media')?.addEventListener('change',function(){
+  const file=this.files&&this.files[0],preview=document.getElementById('sendMediaPreview');preview.innerHTML='';if(!file)return;const url=URL.createObjectURL(file);
+  if(file.type.startsWith('image/'))preview.innerHTML='<img src="'+url+'" style="max-width:260px;max-height:220px;border-radius:10px">';
+  else if(file.type.startsWith('video/'))preview.innerHTML='<video src="'+url+'" controls style="max-width:360px;max-height:240px;border-radius:10px"></video>';
+  else preview.innerHTML='<div class="badge success">📄 '+file.name+'</div>';
+});
+
+document.addEventListener('DOMContentLoaded',targetChanged);
 </script>
 {% endblock %}
