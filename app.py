@@ -3606,6 +3606,36 @@ def template_campaigns():
     )
 
 
+@app.route("/template-campaign/<int:cid>/delete", methods=["POST"])
+def delete_template_campaign(cid):
+    c = db()
+
+    try:
+        result = c.execute(
+            """
+            DELETE FROM template_campaigns
+            WHERE id = ?
+            """,
+            (cid,)
+        )
+
+        c.commit()
+
+        if result.rowcount > 0:
+            flash("Template campaign deleted successfully.")
+        else:
+            flash("Template campaign not found.")
+
+    except Exception as e:
+        c.rollback()
+        flash(f"Delete template campaign error: {e}")
+
+    finally:
+        c.close()
+
+    return redirect(url_for("template_campaigns"))
+
+
 @app.route("/template-campaign/<int:cid>/send", methods=["POST"])
 def send_template_campaign(cid):
 
