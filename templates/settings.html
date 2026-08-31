@@ -1,19 +1,12 @@
-{% extends "base.html" %}{% block title %}Settings - Margdarshak's CRM{% endblock %}{% block page_name %}Settings{% endblock %}
-{% block content %}
-<div class="heading"><h1>Settings</h1><p>WhatsApp Cloud API, database and connected services.</p></div>
-<div class="card theme-card">
-<div><h2>🎨 Appearance</h2><p class="muted" style="margin:0">Choose how Margdarshak's CRM should look on this device.</p></div>
-<div class="theme-options">
-<div class="theme-option"><input type="radio" id="themeLight" name="theme" value="light" data-theme-option onchange="setTheme(this.value)"><label for="themeLight">☀️ Light</label></div>
-<div class="theme-option"><input type="radio" id="themeDark" name="theme" value="dark" data-theme-option onchange="setTheme(this.value)"><label for="themeDark">🌙 Dark</label></div>
-<div class="theme-option"><input type="radio" id="themeSystem" name="theme" value="system" data-theme-option onchange="setTheme(this.value)"><label for="themeSystem">🖥️ System</label></div>
-</div>
-</div>
+{% extends "base.html" %}
+{% block title %}Settings - Margdarshak's CRM{% endblock %}{% block page_name %}Settings{% endblock %}
+{% block content %}<div class="heading"><h1>Settings</h1><p>WhatsApp Cloud API, database and connected services.</p></div>
+<div class="card"><h2>🎨 Appearance</h2><p class="muted">Choose how Margdarshak's CRM should look on this device.</p><div class="theme-switch" style="max-width:360px"><button onclick="setTheme('light')">☀️ Light</button><button onclick="setTheme('dark')">🌙 Dark</button></div></div>
 <div class="grid">
-<div class="card"><h2>💬 WhatsApp Cloud API</h2><div class="health-row"><span>WhatsApp API</span><span class="status {% if config_ok %}approved{% else %}failed{% endif %}">{{ 'Configured' if config_ok else 'Missing' }}</span></div><p class="muted">Required: Access Token + Phone Number ID + Business Account ID.</p></div>
-<div class="card"><h2>🗄 Database</h2><div class="health-row"><span>DATABASE_URL</span><span class="status {% if database_configured %}approved{% else %}failed{% endif %}">{{ 'Configured' if database_configured else 'Missing' }}</span></div><p class="muted">PostgreSQL database connection used by the CRM.</p></div>
-<div class="card"><h2>🔗 Meta & Webhook</h2><div class="health-row"><span>Webhook Verify Token</span><span class="status {% if webhook_token_ok %}approved{% else %}failed{% endif %}">{{ 'Configured' if webhook_token_ok else 'Missing' }}</span></div><div class="health-row"><span>Meta App Secret</span><span class="status {% if app_secret_ok %}approved{% else %}failed{% endif %}">{{ 'Configured' if app_secret_ok else 'Missing' }}</span></div></div>
-<div class="card"><h2>📁 Google Drive</h2><div class="health-row"><span>OAuth Configuration</span><span class="status {% if google_configured %}approved{% else %}failed{% endif %}">{{ 'Configured' if google_configured else 'Missing' }}</span></div><div class="health-row"><span>Connection</span><span class="status {% if google_connected %}approved{% else %}pending{% endif %}">{{ 'Connected' if google_connected else 'Not Connected' }}</span></div><a class="btn blue" href="{{ url_for('google_drive') }}" style="margin-top:14px">Open Google Drive</a></div>
+<div class="card"><h2>💬 WhatsApp Cloud API</h2><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span>WhatsApp API</span><span class="badge {% if config_ok %}success{% else %}danger{% endif %}">{{ 'Configured' if config_ok else 'Missing' }}</span></div><div class="hint" style="margin-top:14px">Required: Access Token + Phone Number ID</div></div>
+<div class="card"><h2>🗄️ Database</h2><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span>DATABASE_URL</span><span class="badge {% if database_configured %}success{% else %}danger{% endif %}">{{ 'Configured' if database_configured else 'Missing' }}</span></div><div class="hint" style="margin-top:14px">PostgreSQL database used by the CRM.</div></div>
+<div class="card"><h2>🔗 Meta & Webhook</h2><div style="display:grid;gap:10px"><div style="display:flex;justify-content:space-between"><span>Webhook Verify Token</span><span class="badge {% if webhook_token_ok %}success{% else %}danger{% endif %}">{{ 'Configured' if webhook_token_ok else 'Missing' }}</span></div><div style="display:flex;justify-content:space-between"><span>Meta App Secret</span><span class="badge {% if app_secret_ok %}success{% else %}danger{% endif %}">{{ 'Configured' if app_secret_ok else 'Missing' }}</span></div></div></div>
+<div class="card"><h2>📂 Google Drive</h2><div style="display:flex;justify-content:space-between"><span>OAuth Configuration</span><span class="badge {% if google_configured %}success{% else %}danger{% endif %}">{{ 'Configured' if google_configured else 'Missing' }}</span></div><div style="display:flex;justify-content:space-between;margin-top:10px"><span>Connection</span><span class="badge {% if google_connected %}success{% else %}neutral{% endif %}">{{ 'Connected' if google_connected else 'Not Connected' }}</span></div><a class="btn blue" style="margin-top:15px" href="{{ url_for('google_drive') }}">📂 Open Google Drive</a></div>
 </div>
-<div class="card"><h2>❤️ System Health</h2><p class="muted">Use the health check endpoint to verify database, WhatsApp and Google service connectivity.</p><a class="btn blue" href="{{ url_for('health') }}" target="_blank">🔎 Open Health Check</a></div>
+<div class="card"><h2>❤️ System Health</h2><p class="muted">Check database, WhatsApp and Google service connectivity.</p><a class="btn blue" href="{{ url_for('health') }}" target="_blank">🔎 Open Health Check</a></div>
 {% endblock %}
