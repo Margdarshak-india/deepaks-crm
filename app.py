@@ -3388,6 +3388,7 @@ def debug_templates():
 # =========================================================
 
 def fetch_meta_templates():
+
     token = get_env("WHATSAPP_ACCESS_TOKEN")
     waba_id = (
         get_env("WHATSAPP_BUSINESS_ACCOUNT_ID")
@@ -3403,7 +3404,10 @@ def fetch_meta_templates():
         r = requests.get(
             url,
             headers={"Authorization": f"Bearer {token}"},
-            params={"fields": "name,language,status,category", "limit": 100},
+            params={
+                "fields": "name,language,status,category,components",
+                "limit": 100
+            },
             timeout=30
         )
         try:
@@ -3414,15 +3418,37 @@ def fetch_meta_templates():
         if not r.ok:
             return [], json.dumps(data, ensure_ascii=False)
 
-        return [
-            {
+        result = []
+        import re
+
+        for x in data.get("data", []):
+            components = x.get("components") or []
+            body_text = ""
+
+            for component in components:
+                if str(component.get("type", "")).upper() == "BODY":
+                    body_text = component.get("text") or ""
+                    break
+
+            variable_numbers = []
+            for match in re.findall(r"\{\{\s*(\d+)\s*\}\}", body_text):
+                number = int(match)
+                if number not in variable_numbers:
+                    variable_numbers.append(number)
+            variable_numbers.sort()
+
+            result.append({
                 "name": x.get("name", ""),
                 "language": x.get("language", "en_US"),
                 "status": x.get("status", "UNKNOWN"),
-                "category": x.get("category", "")
-            }
-            for x in data.get("data", [])
-        ], None
+                "category": x.get("category", ""),
+                "components": components,
+                "body_text": body_text,
+                "variables": variable_numbers,
+                "variable_count": len(variable_numbers)
+            })
+
+        return result, None
 
     except Exception as e:
         return [], str(e)
@@ -3548,10 +3574,9 @@ def template_campaigns():
                 else status.title()
             )
 
-    meta_template_url = (
-        get_env("META_TEMPLATE_MANAGER_URL")
-        or "https://business.facebook.com/"
-    )
+    # Always open Meta's WhatsApp Message Templates manager directly.
+    # This intentionally does not fall back to the Business Manager home page.
+    meta_template_url = "https://business.facebook.com/latest/whatsapp_manager/message_templates"
 
     return render_template(
         "template_campaigns.html",
@@ -3605,9 +3630,18 @@ def send_template_campaign(cid):
 
         values = [
             x.strip()
-            for x in (campaign["parameters"] or "").split(",")
+            for x in (campaign["parameters"] or "").split("||")
             if x.strip()
         ]
+
+        expected_count = int(selected.get("variable_count", 0) or 0)
+
+        if len(values) != expected_count:
+            flash(
+                f"Template '{campaign['template_name']}' requires "
+                f"{expected_count} variable(s), but {len(values)} value(s) were provided."
+            )
+            return redirect(url_for("template_campaigns"))
 
         sent = 0
         failed = 0
@@ -3619,10 +3653,7 @@ def send_template_campaign(cid):
                 failed += 1
                 continue
 
-            if not values:
-                send_values = [contact.get("name") or "Customer"]
-            else:
-                send_values = values[:]
+            send_values = values[:]
 
             ok, message_id, response = send_whatsapp_template(
                 phone,
