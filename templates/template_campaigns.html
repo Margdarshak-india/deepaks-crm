@@ -1,156 +1,3 @@
-{% extends "base.html" %}
-{% block title %}Template Campaign - Margdarshak's CRM{% endblock %}
-{% block page_name %}Template Campaign{% endblock %}
-{% block content %}
-<div class="heading">
-  <h1>Template Campaign</h1>
-  <p>Create, verify and send approved WhatsApp templates.</p>
-</div>
-
-<div class="grid">
-  <div class="card">
-    <div style="font-size:25px">🧩</div>
-    <h2>1. Create Template in Meta</h2>
-    <p class="muted">Create or manage your template in Meta. After approval, return here and refresh.</p>
-    <a class="btn blue full" href="{{ meta_template_url }}" target="_blank" rel="noopener">Open Meta Template Manager ↗</a>
-  </div>
-
-  <div class="card">
-    <div style="font-size:25px">🔄</div>
-    <h2>2. Refresh Templates</h2>
-    <p class="muted">CRM checks the latest templates available to your WhatsApp Business Account.</p>
-    <a class="btn soft full" href="{{ url_for('template_campaigns') }}">↻ Refresh Templates</a>
-  </div>
-</div>
-
-{% if template_error %}
-<div class="notice" style="margin-bottom:20px">Meta template check: {{ template_error }}</div>
-{% endif %}
-
-<div class="card">
-  <h2>✨ Create Template Campaign</h2>
-  <div class="notice" style="margin:14px 0">
-    Only <strong>APPROVED</strong> templates can be sent.
-  </div>
-
-  <form method="POST"
-        action="{{ url_for('template_campaigns') }}"
-        id="templateCampaignForm"
-        enctype="multipart/form-data">
-
-    <input type="hidden" name="action" value="create">
-
-    <label>Campaign Name</label>
-    <input name="name" placeholder="e.g. Admission 2026" required>
-
-    <div class="form-grid" style="margin-top:16px">
-      <div>
-        <label>Template</label>
-        <select name="template_name"
-                id="template_name"
-                required
-                onchange="templateChanged()">
-          <option value="">-- Select Template --</option>
-          {% for t in templates %}
-          <option value="{{ t.name }}"
-                  data-lang="{{ t.language }}"
-                  data-status="{{ t.status }}"
-                  data-body="{{ t.body_text|e }}"
-                  data-variables='{{ t.variables|tojson }}'
-                  data-header="{{ t.header_format }}">
-            {{ t.name }} — {{ t.language }} — {{ t.status }}
-            {% if t.header_format %} — {{ t.header_format }}{% endif %}
-            {% if t.variable_count %}
-              — {{ t.variable_count }} variable{% if t.variable_count != 1 %}s{% endif %}
-            {% endif %}
-          </option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div>
-        <label>Language</label>
-        <input id="template_language"
-               name="template_language"
-               readonly
-               placeholder="Auto-filled from template">
-      </div>
-    </div>
-
-    <div id="templateMediaBox"
-         class="attachment-box"
-         style="display:none;margin-top:16px">
-
-      <h2 id="mediaTitle" style="font-size:16px">📎 Header Media</h2>
-
-      <div id="mediaHint" class="hint" style="margin-bottom:10px">
-        Upload the media required by the selected Meta template header.
-      </div>
-
-      <input type="file"
-             id="header_media"
-             name="header_media"
-             accept="image/jpeg,image/png,video/mp4,video/3gpp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt">
-
-      <div id="mediaPreview" style="margin-top:12px"></div>
-
-      <div class="hint" style="margin-top:10px">
-        Supported: IMAGE (JPG/PNG), VIDEO (MP4/3GP), DOCUMENT (PDF/DOC/DOCX/XLS/XLSX/PPT/PPTX/TXT).
-      </div>
-    </div>
-
-    <div id="templatePreview"
-         class="notice"
-         style="display:none;margin-top:14px;white-space:pre-wrap">
-    </div>
-
-    <div class="form-grid" style="margin-top:16px">
-      <div>
-        <label>Target</label>
-        <select name="target_type" id="target_type" onchange="targetChanged()">
-          <option value="group">Contact Group</option>
-          <option value="single">Single Number</option>
-          <option value="all">All Contacts</option>
-        </select>
-      </div>
-
-      <div id="group" style="display:block">
-        <label>Group</label>
-        <select name="group_name">
-          <option value="">-- Select Group --</option>
-          {% for g in groups %}
-          <option value="{{ g }}">{{ g }}</option>
-          {% endfor %}
-        </select>
-      </div>
-    </div>
-
-    <div id="single" style="display:none;margin-top:14px">
-      <label>WhatsApp Number</label>
-      <input name="manual_number" placeholder="919876543210">
-    </div>
-
-    <div class="attachment-box" style="margin-top:18px">
-      <h2 style="font-size:16px">🔤 Template Variables <span class="muted">(Optional while saving)</span></h2>
-
-      <div id="variablesContainer" class="muted">
-        Select a template to load its variables automatically.
-      </div>
-
-      <input type="hidden" name="parameters" id="parameters">
-
-      <div class="hint" style="margin-top:10px">
-        You may leave these fields blank while saving the campaign.
-        If the Meta template contains variables, all variable values must be filled before sending.
-      </div>
-    </div>
-
-    <div style="margin-top:18px">
-      <button class="btn blue" type="submit">💾 Save Template Campaign</button>
-    </div>
-  </form>
-</div>
-
 <div class="card">
   <h2>📋 Template Campaigns</h2>
 
@@ -226,18 +73,6 @@
     </div>
 
     <form id="sendForm" method="POST" enctype="multipart/form-data" style="margin-top:18px">
-      <div id="sendMediaBox" class="attachment-box" style="display:none">
-        <h3 id="sendMediaTitle" style="margin-top:0">Header Media</h3>
-        <div id="sendMediaHint" class="hint" style="margin-bottom:10px"></div>
-        <input id="send_header_media" name="header_media" type="file">
-        <div id="sendMediaPreview" style="margin-top:10px"></div>
-      </div>
-
-      <div id="sendVariablesBox" class="attachment-box" style="display:none;margin-top:14px">
-        <h3 style="margin-top:0">🔤 Template Variables</h3>
-        <div class="hint">Fill all variables before sending. These were optional while saving.</div>
-        <div id="sendVariablesContainer"></div>
-      </div>
 
       <input type="hidden" name="parameters" id="send_parameters">
 
@@ -266,70 +101,36 @@ const META_TEMPLATES = {{ templates|tojson }};
 let activeSendTemplate = null;
 
 function templateChanged(){
-  const s=document.getElementById('template_name'),o=s.options[s.selectedIndex],lang=document.getElementById('template_language'),p=document.getElementById('templatePreview'),c=document.getElementById('variablesContainer'),params=document.getElementById('parameters');
-  c.innerHTML='';params.value='';
-  if(!o||!o.value){lang.value='';p.style.display='none';c.innerHTML='<div class="muted">Select a template to load its variables automatically.</div>';return}
+  const s=document.getElementById('template_name'),
+        o=s.options[s.selectedIndex],
+        lang=document.getElementById('template_language'),
+        p=document.getElementById('templatePreview');
+  if(!o||!o.value){
+    lang.value='';
+    p.style.display='none';
+    p.textContent='';
+    return;
+  }
   lang.value=o.dataset.lang||'';
-  const body=o.dataset.body||'';p.textContent=body?'Template Body: '+body:'';p.style.display=body?'block':'none';
-  let vars=[];try{vars=JSON.parse(o.dataset.variables||'[]')}catch(e){vars=[]}vars.sort((a,b)=>Number(a)-Number(b));
-  if(!vars.length){c.innerHTML='<div class="badge success">✓ No body variables</div>';return}
-  c.innerHTML='<div class="hint">These fields are optional while saving.</div>';
-  vars.forEach(n=>{const wrap=document.createElement('div');wrap.style.marginTop='12px';const label=document.createElement('label');label.textContent='Variable {{'+n+'}} (Optional)';const input=document.createElement('input');input.type='text';input.className='template-variable-input';input.dataset.number=n;input.placeholder='Enter value for {{'+n+'}} — optional';input.required=false;input.addEventListener('input',updateParameters);wrap.append(label,input);c.appendChild(wrap)})
+  const body=o.dataset.body||'';
+  p.textContent=body;
+  p.style.display=body?'block':'none';
 }
-function updateParameters(){const a=[...document.querySelectorAll('.template-variable-input')].sort((x,y)=>Number(x.dataset.number)-Number(y.dataset.number));document.getElementById('parameters').value=a.map(x=>x.value.trim()).join('||')}
+
 function targetChanged(){const v=document.getElementById('target_type').value;document.getElementById('group').style.display=v==='group'?'block':'none';document.getElementById('single').style.display=v==='single'?'block':'none'}
 
 function findMetaTemplate(name,lang){return META_TEMPLATES.find(t=>t.name===name && t.language===lang)||null}
 
 function openSendModal(cid,name,lang,savedParams){
-  activeSendTemplate=findMetaTemplate(name,lang);
-  if(!activeSendTemplate){alert('Template information could not be loaded. Please refresh templates.');return}
   document.getElementById('sendForm').action='/template-campaign/'+cid+'/send';
   document.getElementById('sendTemplateTitle').textContent=name+' — '+lang;
   document.getElementById('send_parameters').value=savedParams||'';
-
-  const mediaBox=document.getElementById('sendMediaBox');
-  const mediaTitle=document.getElementById('sendMediaTitle');
-  const mediaHint=document.getElementById('sendMediaHint');
-  const mediaInput=document.getElementById('send_header_media');
-  const preview=document.getElementById('sendMediaPreview');
-  mediaInput.value='';preview.innerHTML='';
-
-  const header=(activeSendTemplate.header_format||'').toUpperCase();
-  const type={IMAGE:'image',VIDEO:'video',DOCUMENT:'document'}[header]||'';
-  if(type){
-    mediaBox.style.display='block';
-    mediaTitle.textContent=header==='IMAGE'?'🖼️ Image Header':header==='VIDEO'?'🎬 Video Header':'📄 Document Header';
-    mediaHint.textContent='This '+header+' header is required when sending this template.';
-    mediaInput.accept=header==='IMAGE'?'image/jpeg,image/png':header==='VIDEO'?'video/mp4,video/3gpp':'.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt';
-    mediaInput.required=true;
-  } else {mediaBox.style.display='none';mediaInput.required=false}
-
-  const box=document.getElementById('sendVariablesBox');
-  const vc=document.getElementById('sendVariablesContainer');vc.innerHTML='';
-  const vars=activeSendTemplate.variables||[];
-  if(vars.length){
-    box.style.display='block';
-    let old=(savedParams||'').split('||');
-    vars.forEach((n,i)=>{const wrap=document.createElement('div');wrap.style.marginTop='10px';const label=document.createElement('label');label.textContent='Variable {{'+n+'}}';const input=document.createElement('input');input.type='text';input.className='send-variable-input';input.dataset.number=n;input.value=(old[i]||'');input.placeholder='Required for sending';input.required=true;wrap.append(label,input);vc.appendChild(wrap)});
-  }else{box.style.display='none'}
   document.getElementById('sendModal').style.display='flex';
 }
 
 function closeSendModal(){document.getElementById('sendModal').style.display='none'}
 
-document.getElementById('sendForm').addEventListener('submit',function(e){
-  const vars=[...document.querySelectorAll('.send-variable-input')].sort((a,b)=>Number(a.dataset.number)-Number(b.dataset.number));
-  if(vars.some(x=>!x.value.trim())){e.preventDefault();alert('Please fill all template variables before sending.');return}
-  document.getElementById('send_parameters').value=vars.map(x=>x.value.trim()).join('||');
-});
 
-document.getElementById('send_header_media')?.addEventListener('change',function(){
-  const file=this.files&&this.files[0],preview=document.getElementById('sendMediaPreview');preview.innerHTML='';if(!file)return;const url=URL.createObjectURL(file);
-  if(file.type.startsWith('image/'))preview.innerHTML='<img src="'+url+'" style="max-width:260px;max-height:220px;border-radius:10px">';
-  else if(file.type.startsWith('video/'))preview.innerHTML='<video src="'+url+'" controls style="max-width:360px;max-height:240px;border-radius:10px"></video>';
-  else preview.innerHTML='<div class="badge success">📄 '+file.name+'</div>';
-});
 
 document.addEventListener('DOMContentLoaded',targetChanged);
 </script>
