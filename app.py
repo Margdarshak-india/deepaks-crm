@@ -3775,12 +3775,8 @@ def delete_template_campaign(cid):
     return redirect(url_for("template_campaigns"))
 
 
-@app.route("/template-campaign/<int:cid>/send", methods=["GET", "POST"])
+@app.route("/template-campaign/<int:cid>/send", methods=["POST"])
 def send_template_campaign(cid):
-    # No separate Send page: GET only redirects back to the one-page UI.
-    if request.method == "GET":
-        return redirect(url_for("template_campaigns"))
-
     c = db()
 
     try:
