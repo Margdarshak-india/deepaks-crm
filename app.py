@@ -3664,12 +3664,8 @@ def template_campaigns():
                     header_media_path = legacy_path
                     header_media_type = "image"
 
-            if not header_media_path:
-                flash(
-                    f"This template has a {header_media_type.upper()} header. "
-                    "Please upload the header media."
-                )
-                return redirect(url_for("template_campaigns"))
+            # Header media is intentionally optional while SAVING the campaign.
+            # It is required only when the user actually prepares/sends the campaign.
 
         # Variables are OPTIONAL while creating/saving the campaign.
         # If values are provided, they must match the number of Meta variables.
@@ -3792,7 +3788,7 @@ def delete_template_campaign(cid):
     return redirect(url_for("template_campaigns"))
 
 
-@app.route("/template-campaign/<int:cid>/send", methods=["POST"])
+@app.route("/template-campaign/<int:cid>/send", methods=["GET", "POST"])
 def send_template_campaign(cid):
     c = db()
 
@@ -3825,34 +3821,94 @@ def send_template_campaign(cid):
             flash("Template is not approved. Sending is disabled.")
             return redirect(url_for("template_campaigns"))
 
+        expected_count = int(selected.get("variable_count", 0) or 0)
+        header_media_type = selected.get("header_media_type", "")
+
+        # GET = show a final Send/Prepare screen. This is where media and
+        # variables become mandatory when the Meta template requires them.
+        if request.method == "GET":
+            existing_values = (campaign["parameters"] or "").split("||") if campaign["parameters"] else []
+            existing_values += [""] * max(0, expected_count - len(existing_values))
+            return render_template(
+                "template_campaign_send.html",
+                campaign=campaign,
+                selected=selected,
+                expected_count=expected_count,
+                existing_values=existing_values[:expected_count],
+                header_media_type=header_media_type,
+                existing_media=campaign.get("header_media_path") or campaign.get("header_image_path")
+            )
+
+        # POST = validate the final values/media, save them to the campaign,
+        # then send. Media and variables are NOT required at campaign creation.
+        parameter_values = []
+        if expected_count:
+            for i in range(1, expected_count + 1):
+                parameter_values.append(request.form.get(f"var_{i}", "").strip())
+            if any(not v for v in parameter_values):
+                flash(f"Please fill all {expected_count} template variable(s) before sending.")
+                return redirect(url_for("send_template_campaign", cid=cid))
+
+        parameters_to_save = "||".join(parameter_values) if expected_count else ""
+
+        uploaded_media = request.files.get("header_media")
+        media_path = campaign.get("header_media_path") or campaign.get("header_image_path")
+        media_type = header_media_type
+
+        if selected.get("has_media_header"):
+            if uploaded_media and uploaded_media.filename:
+                filename = secure_filename(uploaded_media.filename)
+                if not filename:
+                    flash("Invalid media filename.")
+                    return redirect(url_for("send_template_campaign", cid=cid))
+
+                ext = os.path.splitext(filename)[1].lower()
+                allowed = {
+                    "image": {".jpg", ".jpeg", ".png"},
+                    "video": {".mp4", ".3gp"},
+                    "document": {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt"}
+                }
+                if ext not in allowed.get(media_type, set()):
+                    flash(f"Please upload a compatible {media_type.upper()} file.")
+                    return redirect(url_for("send_template_campaign", cid=cid))
+
+                upload_dir = os.path.join("static", "uploads", "template_headers")
+                os.makedirs(upload_dir, exist_ok=True)
+                safe_name = f"{secrets.token_hex(8)}_{filename}"
+                media_path = os.path.join(upload_dir, safe_name)
+                uploaded_media.save(media_path)
+
+            if not media_path or not os.path.exists(media_path):
+                flash(f"This template requires a {media_type.upper()} header media file before sending.")
+                return redirect(url_for("send_template_campaign", cid=cid))
+
+        c.execute(
+            "UPDATE template_campaigns SET parameters = ?, header_image_path = ?, header_media_path = ?, header_media_type = ? WHERE id = ?",
+            (
+                parameters_to_save or None,
+                media_path if media_type == "image" else None,
+                media_path or None,
+                media_type or None,
+                cid
+            )
+        )
+        c.commit()
+
         recipients = template_campaign_recipients(campaign)
 
         if not recipients:
             flash("No recipients found.")
             return redirect(url_for("template_campaigns"))
 
-        expected_count = int(selected.get("variable_count", 0) or 0)
-        raw_parameters = campaign["parameters"] or ""
-        values = raw_parameters.split("||") if raw_parameters else []
-
-        # Variables are optional at campaign creation, but WhatsApp needs
-        # complete parameters if the selected approved template contains them.
-        if expected_count:
-            if len(values) != expected_count or any(not x.strip() for x in values):
-                flash(
-                    f"Before sending, please fill all {expected_count} "
-                    f"template variable(s)."
-                )
-                return redirect(url_for("template_campaigns"))
+        values = parameter_values
 
         sent = 0
         failed = 0
 
         header_media_id = None
-        header_media_type = selected.get("header_media_type", "")
 
         if selected.get("has_media_header"):
-            media_path = campaign.get("header_media_path") or campaign.get("header_image_path")
+            media_path = media_path or campaign.get("header_media_path") or campaign.get("header_image_path")
             if not media_path or not os.path.exists(media_path):
                 flash(
                     f"This template requires a {header_media_type.upper()} header media file."
