@@ -3393,14 +3393,7 @@ def debug_templates():
 # =========================================================
 
 def fetch_meta_templates():
-    """
-    Fetch ALL WhatsApp message templates from the configured WABA.
-
-    Important:
-    - Handles Meta pagination instead of reading only the first page.
-    - Does not hide templates based on status/category.
-    - Preserves image/header components so image templates can be used later.
-    """
+    """Fetch all WhatsApp message templates from the configured WABA."""
     token = get_env("WHATSAPP_ACCESS_TOKEN")
     waba_id = (
         get_env("WHATSAPP_BUSINESS_ACCOUNT_ID")
@@ -3410,16 +3403,16 @@ def fetch_meta_templates():
     if not token or not waba_id:
         return [], "WHATSAPP_ACCESS_TOKEN and WHATSAPP_BUSINESS_ACCOUNT_ID are required."
 
-    base_url = f"https://graph.facebook.com/v23.0/{waba_id}/message_templates"
+    url = f"https://graph.facebook.com/v23.0/{waba_id}/message_templates"
     headers = {"Authorization": f"Bearer {token}"}
+    params = {
+        "fields": "id,name,language,status,category,components",
+        "limit": 100
+    }
 
     try:
         result = []
-        next_url = base_url
-        params = {
-            "fields": "id,name,language,status,category,components",
-            "limit": 100
-        }
+        next_url = url
 
         while next_url:
             r = requests.get(
@@ -3445,10 +3438,7 @@ def fetch_meta_templates():
                 buttons_component = None
 
                 for component in components:
-                    component_type = str(
-                        component.get("type", "")
-                    ).upper()
-
+                    component_type = str(component.get("type", "")).upper()
                     if component_type == "BODY":
                         body_text = component.get("text") or ""
                     elif component_type == "HEADER":
@@ -3459,14 +3449,10 @@ def fetch_meta_templates():
                         buttons_component = component
 
                 variable_numbers = []
-                for match in re.findall(
-                    r"\{\{\s*(\d+)\s*\}\}",
-                    body_text
-                ):
-                    number = int(match)
-                    if number not in variable_numbers:
-                        variable_numbers.append(number)
-
+                for match in re.findall(r"\{\{\s*(\d+)\s*\}\}", body_text):
+                    n = int(match)
+                    if n not in variable_numbers:
+                        variable_numbers.append(n)
                 variable_numbers.sort()
 
                 result.append({
@@ -3484,25 +3470,17 @@ def fetch_meta_templates():
                     "variable_count": len(variable_numbers)
                 })
 
-            # Follow every Meta pagination page.
-            paging = data.get("paging") or {}
-            next_url = paging.get("next")
+            next_url = (data.get("paging") or {}).get("next")
             params = None
 
-        # Remove accidental duplicates while preserving Meta order.
         unique = []
         seen = set()
-
         for item in result:
-            key = (
-                item.get("name", ""),
-                item.get("language", "")
-            )
+            key = (item.get("name", ""), item.get("language", ""))
             if key not in seen:
                 seen.add(key)
                 unique.append(item)
 
-        # Put the newest/specific MBBS template first if present.
         unique.sort(
             key=lambda x: (
                 0 if x.get("name") == "mbbs_admission_alert" else 1,
@@ -3510,7 +3488,6 @@ def fetch_meta_templates():
                 x.get("language", "")
             )
         )
-
         return unique, None
 
     except Exception as e:
@@ -3538,12 +3515,10 @@ def template_campaign_recipients(campaign):
 @app.route("/api/meta-template-status")
 def meta_template_status():
     templates, error = fetch_meta_templates()
-
     waba_id = (
         get_env("WHATSAPP_BUSINESS_ACCOUNT_ID")
         or get_env("WHATSAPP_WABA_ID")
     )
-
     return jsonify({
         "waba_id": waba_id or "",
         "error": error,
@@ -3692,6 +3667,27 @@ def template_campaigns():
         template_error=template_error,
         meta_template_url=meta_template_url
     )
+
+
+@app.route("/template-campaign/<int:cid>/delete", methods=["POST"])
+def delete_template_campaign(cid):
+    c = db()
+    try:
+        result = c.execute(
+            "DELETE FROM template_campaigns WHERE id = ?",
+            (cid,)
+        )
+        c.commit()
+        if result.rowcount > 0:
+            flash("Template campaign deleted successfully.")
+        else:
+            flash("Template campaign not found.")
+    except Exception as e:
+        c.rollback()
+        flash(f"Delete template campaign error: {e}")
+    finally:
+        c.close()
+    return redirect(url_for("template_campaigns"))
 
 
 @app.route("/template-campaign/<int:cid>/send", methods=["POST"])
