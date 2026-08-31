@@ -106,11 +106,14 @@
 
     <div id="single" style="display:none;margin-top:14px">
       <label>WhatsApp Number</label>
-      <input name="manual_number" id="manual_number" list="contactNumbers" inputmode="numeric" placeholder="Enter a new number or select a saved contact number">
+      <div class="number-entry-row">
+        <input name="manual_number" id="manual_number" list="contactNumbers" inputmode="numeric" autocomplete="off" placeholder="Type a number and press Enter">
+        <button type="button" class="btn blue" onclick="addManualNumber()">＋ Add</button>
+      </div>
       <datalist id="contactNumbers">
         {% for c in contacts %}<option value="{{ c.phone }}">{{ c.name }}{% if c.group_name %} — {{ c.group_name }}{% endif %}</option>{% endfor %}
       </datalist>
-      <div class="hint">You can type a new number or choose a number already saved in Contacts.</div>
+      <div class="hint">Type a new number and press Enter. Each number is added to the Send Number List below.</div>
     </div>
 
     <div id="selected" class="selected-target" style="display:none;margin-top:16px">
@@ -142,6 +145,20 @@
         {% endfor %}
       </div>
       <input type="hidden" name="selected_contact_ids" id="selected_contact_ids" value="[]">
+    </div>
+
+    <div id="sendNumberListBox" class="send-number-list-box" style="display:none;margin-top:16px">
+      <div class="picker-head">
+        <div>
+          <label style="margin:0">📱 Send Number List</label>
+          <div class="hint" style="margin-top:3px">Typed numbers and selected contacts are saved together here.</div>
+        </div>
+        <div id="sendNumberSummary" class="selected-summary">0 numbers</div>
+      </div>
+      <div id="sendNumberList" class="send-number-list">
+        <div class="empty">No numbers added yet.</div>
+      </div>
+      <input type="hidden" name="manual_numbers" id="manual_numbers" value="[]">
     </div>
 
     <button class="btn blue" type="submit">💾 Save Template Campaign</button>
@@ -241,7 +258,7 @@
 <style>
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px}
 .modal-card{background:#fff;width:min(680px,100%);max-height:90vh;overflow:auto;border-radius:16px;padding:22px;box-shadow:0 18px 60px rgba(0,0,0,.25)}
-.selected-target{width:100%}.picker-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:10px}.selected-summary{margin:0;padding:7px 12px;border-radius:999px;background:#e8f7f1;color:#087f5b;font-size:13px;font-weight:700;white-space:nowrap}.contact-search-wrap{position:relative;margin-bottom:4px}.contact-search-wrap .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:.65}.contact-search-wrap input{padding-left:38px!important;padding-right:42px!important;margin:0!important}.clear-search{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:#718096;font-size:22px;line-height:1;width:30px;height:30px;border-radius:50%;cursor:pointer;display:none}.clear-search:hover{background:#eef2f7;color:#334155}.contact-search-status{font-size:12px;color:#718096;margin:0 2px 8px}.contact-list-header{display:grid;grid-template-columns:minmax(0,1fr) 150px;padding:8px 16px;background:#f6f8fb;border:1px solid #d8dee8;border-bottom:0;border-radius:12px 12px 0 0;color:#718096;font-size:11px;font-weight:800;letter-spacing:.05em}.contact-picker{border:1px solid #d8dee8;border-radius:0 0 12px 12px;max-height:320px;overflow:auto;background:#fff}.contact-option{display:grid;grid-template-columns:28px minmax(0,1fr) 150px;align-items:center;gap:8px;padding:11px 16px;border-bottom:1px solid #eef1f5;cursor:pointer;margin:0;background:#fff;transition:background .12s}.contact-option:last-child{border-bottom:0}.contact-option:hover{background:#f8fbff}.contact-option:has(input:checked){background:#f0fbf7}.check-wrap{display:flex!important;align-items:center;justify-content:flex-start!important}.check-wrap input{position:absolute;opacity:0;width:1px;height:1px}.fake-check{width:18px;height:18px;border:1.5px solid #b8c2d0;border-radius:4px;background:#fff;display:block!important;position:relative}.check-wrap input:checked + .fake-check{background:#0aa879;border-color:#0aa879}.check-wrap input:checked + .fake-check:after{content:'✓';position:absolute;color:#fff;font-size:13px;font-weight:800;left:3px;top:-1px}.contact-main{display:flex!important;flex-direction:column!important;min-width:0}.contact-main strong{font-size:14px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.contact-main small{opacity:.72;margin-top:3px;font-size:12px}.contact-group{font-size:12px;color:#5f6b7a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.empty{padding:20px;text-align:center;color:#7b8794}@media(max-width:700px){.contact-list-header{grid-template-columns:1fr 100px}.contact-option{grid-template-columns:28px minmax(0,1fr) 100px;padding:10px 10px}.contact-group{font-size:11px}.picker-head{align-items:flex-start;flex-direction:column}.selected-summary{align-self:flex-start}}
+.selected-target{width:100%}.picker-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:10px}.selected-summary{margin:0;padding:7px 12px;border-radius:999px;background:#e8f7f1;color:#087f5b;font-size:13px;font-weight:700;white-space:nowrap}.contact-search-wrap{position:relative;margin-bottom:4px}.contact-search-wrap .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:.65}.contact-search-wrap input{padding-left:38px!important;padding-right:42px!important;margin:0!important}.clear-search{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:#718096;font-size:22px;line-height:1;width:30px;height:30px;border-radius:50%;cursor:pointer;display:none}.clear-search:hover{background:#eef2f7;color:#334155}.contact-search-status{font-size:12px;color:#718096;margin:0 2px 8px}.contact-list-header{display:grid;grid-template-columns:minmax(0,1fr) 150px;padding:8px 16px;background:#f6f8fb;border:1px solid #d8dee8;border-bottom:0;border-radius:12px 12px 0 0;color:#718096;font-size:11px;font-weight:800;letter-spacing:.05em}.contact-picker{border:1px solid #d8dee8;border-radius:0 0 12px 12px;max-height:320px;overflow:auto;background:#fff}.contact-option{display:grid;grid-template-columns:28px minmax(0,1fr) 150px;align-items:center;gap:8px;padding:11px 16px;border-bottom:1px solid #eef1f5;cursor:pointer;margin:0;background:#fff;transition:background .12s}.contact-option:last-child{border-bottom:0}.contact-option:hover{background:#f8fbff}.contact-option:has(input:checked){background:#f0fbf7}.check-wrap{display:flex!important;align-items:center;justify-content:flex-start!important}.check-wrap input{position:absolute;opacity:0;width:1px;height:1px}.fake-check{width:18px;height:18px;border:1.5px solid #b8c2d0;border-radius:4px;background:#fff;display:block!important;position:relative}.check-wrap input:checked + .fake-check{background:#0aa879;border-color:#0aa879}.check-wrap input:checked + .fake-check:after{content:'✓';position:absolute;color:#fff;font-size:13px;font-weight:800;left:3px;top:-1px}.contact-main{display:flex!important;flex-direction:column!important;min-width:0}.contact-main strong{font-size:14px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.contact-main small{opacity:.72;margin-top:3px;font-size:12px}.contact-group{font-size:12px;color:#5f6b7a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.empty{padding:20px;text-align:center;color:#7b8794}.number-entry-row{display:flex;gap:8px;align-items:stretch}.number-entry-row input{margin:0!important;flex:1}.send-number-list-box{border:1px solid #d8dee8;border-radius:12px;padding:14px;background:#fbfcfe}.send-number-list{border:1px solid #d8dee8;border-radius:10px;background:#fff;max-height:220px;overflow:auto}.send-number-item{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #eef1f5}.send-number-item:last-child{border-bottom:0}.send-number-meta{display:flex;flex-direction:column;min-width:0}.send-number-meta strong{font-size:13px}.send-number-meta small{color:#718096;margin-top:2px}.remove-number{border:0;background:#fff0f0;color:#c53030;border-radius:8px;padding:5px 9px;cursor:pointer;font-weight:700}.remove-number:hover{background:#ffe0e0}@media(max-width:700px){.contact-list-header{grid-template-columns:1fr 100px}.contact-option{grid-template-columns:28px minmax(0,1fr) 100px;padding:10px 10px}.contact-group{font-size:11px}.picker-head{align-items:flex-start;flex-direction:column}.selected-summary{align-self:flex-start}}
 </style>
 <script>
 const META_TEMPLATES = {{ templates|tojson }};
@@ -257,7 +274,8 @@ function templateChanged(){
   p.style.display=body?'block':'none';
 }
 function updateParameters(){}
-function targetChanged(){const v=document.getElementById('target_type').value;document.getElementById('group').style.display=v==='group'?'block':'none';document.getElementById('single').style.display=v==='single'?'block':'none';document.getElementById('selected').style.display=v==='selected'?'block':'none'}
+let sendNumbers=[];
+function targetChanged(){const v=document.getElementById('target_type').value;document.getElementById('group').style.display=v==='group'?'block':'none';document.getElementById('single').style.display=v==='single'?'block':'none';document.getElementById('selected').style.display=v==='selected'?'block':'none';document.getElementById('sendNumberListBox').style.display=(v==='single'||v==='selected')?'block':'none'; if(v!=='single' && document.getElementById('manual_number')) document.getElementById('manual_number').value=''; updateSendNumberList();}
 function normalizeContactSearch(value){return String(value||'').toLowerCase().replace(/\s+/g,'').replace(/[+()\-]/g,'')}
 function filterContacts(){
   const input=document.getElementById('contactSearch');
@@ -279,7 +297,20 @@ function filterContacts(){
   if(status) status.textContent=q ? (shown ? `Showing ${shown} contact${shown===1?'':'s'} matching “${q}”` : `No contacts found for “${q}”`) : `Showing ${rows.length} contact${rows.length===1?'':'s'}`;
 }
 function clearContactSearch(){const input=document.getElementById('contactSearch');input.value='';filterContacts();input.focus();}
-function updateSelectedContacts(){const ids=[...document.querySelectorAll('#contactList input[type=checkbox]:checked')].map(x=>Number(x.value));document.getElementById('selected_contact_ids').value=JSON.stringify(ids);document.getElementById('selectedContactsSummary').textContent=ids.length+' selected';}
+function normalizeSendNumber(v){return String(v||'').replace(/[^0-9]/g,'').replace(/^0+/,'');}
+function addManualNumber(){const input=document.getElementById('manual_number');const raw=(input.value||'').trim();const n=normalizeSendNumber(raw);if(n.length<8){input.focus();return;}if(!sendNumbers.includes(n)) sendNumbers.push(n);input.value='';updateSendNumberList();input.focus();}
+function removeManualNumber(n){sendNumbers=sendNumbers.filter(x=>x!==n);updateSendNumberList();}
+function updateSelectedContacts(){const ids=[...document.querySelectorAll('#contactList input[type=checkbox]:checked')].map(x=>Number(x.value));document.getElementById('selected_contact_ids').value=JSON.stringify(ids);document.getElementById('selectedContactsSummary').textContent=ids.length+' selected';
+  const rows=[...document.querySelectorAll('#contactList input[type=checkbox]:checked')];
+  rows.forEach(cb=>{const row=cb.closest('.contact-option');const phone=normalizeSendNumber(row?.dataset.phone||'');if(phone&&!sendNumbers.includes(phone))sendNumbers.push(phone);});
+  const allRows=[...document.querySelectorAll('#contactList .contact-option')];
+  const checkedPhones=new Set(rows.map(cb=>normalizeSendNumber(cb.closest('.contact-option')?.dataset.phone||'')));
+  // Remove contact-derived numbers that are no longer checked, but keep manually typed numbers.
+  allRows.forEach(row=>{const cb=row.querySelector('input[type=checkbox]');const phone=normalizeSendNumber(row.dataset.phone||'');if(cb&&!cb.checked && phone) sendNumbers=sendNumbers.filter(n=>n!==phone);});
+  updateSendNumberList();
+}
+function updateSendNumberList(){const box=document.getElementById('sendNumberList');const hidden=document.getElementById('manual_numbers');const summary=document.getElementById('sendNumberSummary');if(!box||!hidden)return;hidden.value=JSON.stringify(sendNumbers);if(summary)summary.textContent=sendNumbers.length+' number'+(sendNumbers.length===1?'':'s');if(!sendNumbers.length){box.innerHTML='<div class="empty">No numbers added yet.</div>';return;}box.innerHTML='';sendNumbers.forEach((n,i)=>{const item=document.createElement('div');item.className='send-number-item';item.innerHTML='<div class="send-number-meta"><strong>'+(i+1)+'. '+n+'</strong><small>Ready to send</small></div><button type="button" class="remove-number" onclick="removeManualNumber(\''+n+'\')">Remove</button>';box.appendChild(item);});}
+function addNumberOnEnter(e){if(e.key==='Enter'){e.preventDefault();addManualNumber();}}
 
 function findMetaTemplate(name,lang){return META_TEMPLATES.find(t=>t.name===name && t.language===lang)||null}
 
@@ -320,6 +351,6 @@ function updateSendParameters(){
 
 function closeSendModal(){document.getElementById('sendModal').style.display='none'}
 
-document.addEventListener('DOMContentLoaded',targetChanged);
+document.addEventListener('DOMContentLoaded',()=>{targetChanged();const input=document.getElementById('manual_number');if(input)input.addEventListener('keydown',addNumberOnEnter);});
 </script>
 {% endblock %}
