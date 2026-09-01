@@ -105,15 +105,21 @@
     </div>
 
     <div id="single" style="display:none;margin-top:14px">
-      <label>WhatsApp Number</label>
-      <div class="number-entry-row">
-        <input name="manual_number" id="manual_number" list="typedNumberHistory" inputmode="numeric" autocomplete="off" placeholder="Type a number and press Enter">
-        <button type="button" class="btn blue" onclick="addManualNumber()">＋ Add</button>
+      <label for="manual_number">WhatsApp Number</label>
+      <div class="manual-number-box">
+        <div class="manual-number-entry">
+          <input name="manual_number" id="manual_number" type="tel" inputmode="numeric" autocomplete="off" placeholder="Type WhatsApp number" aria-label="WhatsApp number">
+          <button type="button" class="btn blue add-number-btn" onclick="addManualNumber()">＋ Add</button>
+        </div>
+        <div class="typed-history-row">
+          <label for="typedHistorySelect" class="history-label">Previously typed numbers</label>
+          <select id="typedHistorySelect" class="typed-history-select" onchange="useTypedHistoryNumber(this.value)">
+            <option value="">-- Select previously typed number --</option>
+            {% for n in typed_number_history %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+          </select>
+        </div>
       </div>
-      <datalist id="typedNumberHistory">
-        {% for n in typed_number_history %}<option value="{{ n }}"></option>{% endfor %}
-      </datalist>
-      <div class="hint">Type a new number and press Enter. Suggestions here are only numbers you previously typed.</div>
+      <div class="hint">Type a new number and press Enter. The history contains only numbers you previously typed, not CRM contacts.</div>
     </div>
 
     <div id="selected" class="selected-target" style="display:none;margin-top:16px">
@@ -259,7 +265,7 @@
 <style>
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px}
 .modal-card{background:#fff;width:min(680px,100%);max-height:90vh;overflow:auto;border-radius:16px;padding:22px;box-shadow:0 18px 60px rgba(0,0,0,.25)}
-.selected-target{width:100%}.picker-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:10px}.selected-summary{margin:0;padding:7px 12px;border-radius:999px;background:#e8f7f1;color:#087f5b;font-size:13px;font-weight:700;white-space:nowrap}.contact-search-wrap{position:relative;margin-bottom:4px}.contact-search-wrap .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:.65}.contact-search-wrap input{padding-left:38px!important;padding-right:42px!important;margin:0!important}.clear-search{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:#718096;font-size:22px;line-height:1;width:30px;height:30px;border-radius:50%;cursor:pointer;display:none}.clear-search:hover{background:#eef2f7;color:#334155}.contact-search-status{font-size:12px;color:#718096;margin:0 2px 8px}.contact-list-header{display:grid;grid-template-columns:minmax(0,1fr) 150px;padding:8px 16px;background:#f6f8fb;border:1px solid #d8dee8;border-bottom:0;border-radius:12px 12px 0 0;color:#718096;font-size:11px;font-weight:800;letter-spacing:.05em}.contact-picker{border:1px solid #d8dee8;border-radius:0 0 12px 12px;max-height:320px;overflow:auto;background:#fff}.contact-option{display:grid;grid-template-columns:28px minmax(0,1fr) 150px;align-items:center;gap:8px;padding:11px 16px;border-bottom:1px solid #eef1f5;cursor:pointer;margin:0;background:#fff;transition:background .12s}.contact-option:last-child{border-bottom:0}.contact-option:hover{background:#f8fbff}.contact-option:has(input:checked){background:#f0fbf7}.check-wrap{display:flex!important;align-items:center;justify-content:flex-start!important}.check-wrap input{position:absolute;opacity:0;width:1px;height:1px}.fake-check{width:18px;height:18px;border:1.5px solid #b8c2d0;border-radius:4px;background:#fff;display:block!important;position:relative}.check-wrap input:checked + .fake-check{background:#0aa879;border-color:#0aa879}.check-wrap input:checked + .fake-check:after{content:'✓';position:absolute;color:#fff;font-size:13px;font-weight:800;left:3px;top:-1px}.contact-main{display:flex!important;flex-direction:column!important;min-width:0}.contact-main strong{font-size:14px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.contact-main small{opacity:.72;margin-top:3px;font-size:12px}.contact-group{font-size:12px;color:#5f6b7a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.empty{padding:20px;text-align:center;color:#7b8794}.number-entry-row{display:flex;gap:8px;align-items:stretch}.number-entry-row input{margin:0!important;flex:1}.send-number-list-box{border:1px solid #d8dee8;border-radius:12px;padding:14px;background:#fbfcfe}.send-number-list{border:1px solid #d8dee8;border-radius:10px;background:#fff;max-height:220px;overflow:auto}.send-number-item{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #eef1f5}.send-number-item:last-child{border-bottom:0}.send-number-meta{display:flex;flex-direction:column;min-width:0}.send-number-meta strong{font-size:13px}.send-number-meta small{color:#718096;margin-top:2px}.remove-number{border:0;background:#fff0f0;color:#c53030;border-radius:8px;padding:5px 9px;cursor:pointer;font-weight:700}.remove-number:hover{background:#ffe0e0}@media(max-width:700px){.contact-list-header{grid-template-columns:1fr 100px}.contact-option{grid-template-columns:28px minmax(0,1fr) 100px;padding:10px 10px}.contact-group{font-size:11px}.picker-head{align-items:flex-start;flex-direction:column}.selected-summary{align-self:flex-start}}
+.selected-target{width:100%}.picker-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:10px}.selected-summary{margin:0;padding:7px 12px;border-radius:999px;background:#e8f7f1;color:#087f5b;font-size:13px;font-weight:700;white-space:nowrap}.contact-search-wrap{position:relative;margin-bottom:4px}.contact-search-wrap .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:.65}.contact-search-wrap input{padding-left:38px!important;padding-right:42px!important;margin:0!important}.clear-search{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:#718096;font-size:22px;line-height:1;width:30px;height:30px;border-radius:50%;cursor:pointer;display:none}.clear-search:hover{background:#eef2f7;color:#334155}.contact-search-status{font-size:12px;color:#718096;margin:0 2px 8px}.contact-list-header{display:grid;grid-template-columns:minmax(0,1fr) 150px;padding:8px 16px;background:#f6f8fb;border:1px solid #d8dee8;border-bottom:0;border-radius:12px 12px 0 0;color:#718096;font-size:11px;font-weight:800;letter-spacing:.05em}.contact-picker{border:1px solid #d8dee8;border-radius:0 0 12px 12px;max-height:320px;overflow:auto;background:#fff}.contact-option{display:grid;grid-template-columns:28px minmax(0,1fr) 150px;align-items:center;gap:8px;padding:11px 16px;border-bottom:1px solid #eef1f5;cursor:pointer;margin:0;background:#fff;transition:background .12s}.contact-option:last-child{border-bottom:0}.contact-option:hover{background:#f8fbff}.contact-option:has(input:checked){background:#f0fbf7}.check-wrap{display:flex!important;align-items:center;justify-content:flex-start!important}.check-wrap input{position:absolute;opacity:0;width:1px;height:1px}.fake-check{width:18px;height:18px;border:1.5px solid #b8c2d0;border-radius:4px;background:#fff;display:block!important;position:relative}.check-wrap input:checked + .fake-check{background:#0aa879;border-color:#0aa879}.check-wrap input:checked + .fake-check:after{content:'✓';position:absolute;color:#fff;font-size:13px;font-weight:800;left:3px;top:-1px}.contact-main{display:flex!important;flex-direction:column!important;min-width:0}.contact-main strong{font-size:14px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.contact-main small{opacity:.72;margin-top:3px;font-size:12px}.contact-group{font-size:12px;color:#5f6b7a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.empty{padding:20px;text-align:center;color:#7b8794}.manual-number-box{width:100%;box-sizing:border-box}.manual-number-entry{display:grid;grid-template-columns:minmax(0,1fr) 92px;gap:8px;width:100%;align-items:stretch}.manual-number-entry input{display:block!important;width:100%!important;min-width:0!important;box-sizing:border-box!important;margin:0!important;height:46px!important;padding:10px 12px!important}.add-number-btn{width:92px!important;min-width:92px!important;max-width:92px!important;padding:8px 10px!important;white-space:nowrap}.typed-history-row{display:grid;grid-template-columns:180px minmax(0,1fr);gap:10px;align-items:center;margin-top:9px}.history-label{margin:0!important;font-size:12px!important;color:#718096!important}.typed-history-select{width:100%!important;min-width:0!important;margin:0!important;height:40px!important;padding:7px 10px!important;box-sizing:border-box!important}.send-number-list-box{border:1px solid #d8dee8;border-radius:12px;padding:14px;background:#fbfcfe}.send-number-list{border:1px solid #d8dee8;border-radius:10px;background:#fff;max-height:220px;overflow:auto}.send-number-item{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #eef1f5}.send-number-item:last-child{border-bottom:0}.send-number-meta{display:flex;flex-direction:column;min-width:0}.send-number-meta strong{font-size:13px}.send-number-meta small{color:#718096;margin-top:2px}.remove-number{border:0;background:#fff0f0;color:#c53030;border-radius:8px;padding:5px 9px;cursor:pointer;font-weight:700}.remove-number:hover{background:#ffe0e0}@media(max-width:700px){.contact-list-header{grid-template-columns:1fr 100px}.contact-option{grid-template-columns:28px minmax(0,1fr) 100px;padding:10px 10px}.contact-group{font-size:11px}.picker-head{align-items:flex-start;flex-direction:column}.selected-summary{align-self:flex-start}.manual-number-entry{grid-template-columns:minmax(0,1fr) 78px;gap:7px}.add-number-btn{width:78px!important;min-width:78px!important;max-width:78px!important;padding:8px 7px!important}.typed-history-row{grid-template-columns:1fr;gap:5px}.history-label{font-size:12px!important}}
 </style>
 <script>
 const META_TEMPLATES = {{ templates|tojson }};
@@ -286,10 +292,16 @@ function loadTypedNumberHistory(){
   renderTypedNumberHistory();
 }
 function renderTypedNumberHistory(){
-  const dl=document.getElementById('typedNumberHistory');
-  if(!dl)return;
-  dl.innerHTML='';
-  typedNumbers.forEach(n=>{const o=document.createElement('option');o.value=n;dl.appendChild(o);});
+  const sel=document.getElementById('typedHistorySelect');
+  if(!sel)return;
+  const current=sel.value;
+  sel.innerHTML='<option value="">-- Select previously typed number --</option>';
+  typedNumbers.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});
+  if(typedNumbers.includes(current))sel.value=current;
+}
+function useTypedHistoryNumber(n){
+  const input=document.getElementById('manual_number');
+  if(input && n){input.value=n;input.focus();}
 }
 function rememberTypedNumber(n){
   n=normalizeSendNumber(n);
