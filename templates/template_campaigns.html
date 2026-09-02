@@ -279,7 +279,7 @@
       <input type="hidden" id="send_header_media_id" name="header_media_id" value="">
 
       <div style="display:flex;gap:10px;margin-top:16px">
-        <button class="btn green" id="sendSubmitBtn" type="submit">📤 Send Now</button>
+        <button class="btn green" id="sendSubmitBtn" type="button" onclick="submitSendCampaign()">📤 Send Now</button>
         <button class="btn soft" type="button" onclick="closeSendModal()">Cancel</button>
       </div>
     </form>
@@ -455,16 +455,12 @@ function updateSendParameters(){
 }
 
 async function uploadSendHeaderMedia(input){
-  // Kept only for backward compatibility with older pages.  The current send
-  // flow does NOT depend on this AJAX upload; the multipart /send request is
-  // responsible for uploading and persisting the media server-side.
   return !!(input && input.files && input.files[0]);
 }
 
-document.addEventListener('submit', function(e){
-  const form=e.target;
-  if(!form || form.id!=='sendForm') return;
-  e.preventDefault();
+async function submitSendCampaign(){
+  const form=document.getElementById('sendForm');
+  if(!form) return;
 
   const btn=document.getElementById('sendSubmitBtn');
   const status=document.getElementById('sendMediaStatus');
@@ -472,6 +468,12 @@ document.addEventListener('submit', function(e){
   const mediaIdInput=document.getElementById('send_header_media_id');
   const mode=document.getElementById('send_mode').value;
   const scheduled=document.getElementById('scheduled_at');
+  const cid=form.dataset.campaignId;
+
+  if(!cid){
+    alert('Campaign ID is missing. Please close and open Send Campaign again.');
+    return;
+  }
 
   if(mode==='schedule'){
     if(!scheduled || !scheduled.value){
@@ -495,27 +497,71 @@ document.addEventListener('submit', function(e){
   }
   updateSendParameters();
 
-  // Do not use HTML5 required validation and do not upload media through a
-  // second AJAX request. The selected file stays in the multipart form and is
-  // processed by Flask in the same request as Send/Schedule.
-  if(mediaInput && mediaInput.files && mediaInput.files[0]){
-    if(status){
-      status.textContent='📤 Media attached. It will be uploaded to WhatsApp when you send.';
-      status.style.color='#087f5b';
-    }
-  } else if(mediaIdInput && String(mediaIdInput.value||'').trim()){
-    if(status){
-      status.textContent='✅ Saved WhatsApp media will be used.';
-      status.style.color='#087f5b';
-    }
-  }
-
+  if(btn.disabled) return;
   btn.disabled=true;
-  btn.textContent=mode==='schedule'?'⏳ Scheduling...':'⏳ Sending...';
+  btn.textContent=mode==='schedule'?'⏳ Uploading / Scheduling...':'⏳ Uploading / Sending...';
 
-  // Native form submission preserves multipart/form-data including the file.
-  form.submit();
-});
+  try{
+    // IMPORTANT: upload media explicitly first. This guarantees the selected
+    // browser file reaches Flask/Meta instead of relying on native form.submit().
+    if(mediaInput && mediaInput.files && mediaInput.files[0]){
+      if(status){
+        status.textContent='📤 Uploading media to WhatsApp...';
+        status.style.color='#087f5b';
+      }
+
+      const uploadData=new FormData();
+      uploadData.append('header_media', mediaInput.files[0]);
+      const uploadResponse=await fetch('/template-campaign/'+encodeURIComponent(cid)+'/upload-media',{
+        method:'POST',
+        body:uploadData,
+        credentials:'same-origin'
+      });
+      const uploadText=await uploadResponse.text();
+      let uploadJson=null;
+      try{ uploadJson=JSON.parse(uploadText); }catch(_e){}
+
+      if(!uploadResponse.ok || !uploadJson || !uploadJson.ok || !uploadJson.media_id){
+        const msg=(uploadJson && (uploadJson.error || uploadJson.message)) || uploadText || ('HTTP '+uploadResponse.status);
+        throw new Error('Media upload failed: '+msg);
+      }
+
+      mediaIdInput.value=String(uploadJson.media_id);
+      if(status){
+        status.textContent='✅ Media uploaded successfully. Media ID saved.';
+        status.style.color='#087f5b';
+      }
+    }
+
+    // Send/schedule using the persisted Meta Media ID. Do not send the browser
+    // file a second time; the media is already stored against the campaign.
+    const sendData=new FormData(form);
+    sendData.delete('header_media');
+    sendData.set('header_media_id', mediaIdInput ? String(mediaIdInput.value||'') : '');
+
+    const response=await fetch(form.action,{
+      method:'POST',
+      body:sendData,
+      credentials:'same-origin'
+    });
+
+    if(response.redirected){
+      window.location.href=response.url;
+      return;
+    }
+
+    const text=await response.text();
+    if(!response.ok){
+      throw new Error(text || ('Send request failed: HTTP '+response.status));
+    }
+    window.location.reload();
+  }catch(err){
+    console.error('Template campaign send error:',err);
+    alert(String(err && err.message ? err.message : err));
+    btn.disabled=false;
+    btn.textContent=mode==='schedule'?'⏰ Schedule Send':'📤 Send Now';
+  }
+}
 
 function istDateTimeLocalMin(){
   const now=new Date();
