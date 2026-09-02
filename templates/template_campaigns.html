@@ -2,20 +2,20 @@
 {% block title %}Template Campaign - Margdarshak's CRM{% endblock %}
 {% block page_name %}Template Campaign{% endblock %}
 {% block content %}
-{% with messages = get_flashed_messages() %}
-  {% if messages %}
-    <div class="flash-messages" style="margin:0 0 20px 0; display:flex; flex-direction:column; gap:10px;">
-      {% for message in messages %}
-        <div class="notice" style="margin:0; padding:14px 16px; border-radius:12px; font-weight:600;">{{ message }}</div>
-      {% endfor %}
-    </div>
-  {% endif %}
-{% endwith %}
-
 <div class="heading">
   <h1>Template Campaign</h1>
   <p>Create, verify and send approved WhatsApp templates.</p>
 </div>
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="flash-messages" style="margin-bottom:20px">
+      {% for message in messages %}
+        <div class="notice" style="margin-bottom:8px">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
 
 <div class="grid">
   <div class="card">
@@ -219,6 +219,17 @@
             <span class="badge {% if c.status=='Approved' %}success{% elif c.status=='Scheduled' %}warning{% elif c.status=='Sending' %}warning{% elif c.status=='Completed' %}success{% elif c.status in ['Failed','Rejected'] %}danger{% else %}neutral{% endif %}">
               {{ c.status }}
             </span>
+            {% if c.delivery_total|default(0) > 0 %}
+              <div class="delivery-summary">
+                <span>Accepted {{ c.delivery_accepted|default(0) }}</span>
+                <span>Sent {{ c.delivery_sent|default(0) }}</span>
+                <span>Delivered {{ c.delivery_delivered|default(0) }}</span>
+                <span>Read {{ c.delivery_read|default(0) }}</span>
+                {% if c.delivery_failed|default(0) > 0 %}
+                  <span class="delivery-failed">Failed {{ c.delivery_failed }}</span>
+                {% endif %}
+              </div>
+            {% endif %}
           </td>
           <td>
             {% if c.scheduled_at %}
@@ -315,6 +326,22 @@
 .campaign-delete-form{
   display:block!important;
   margin-top:10px!important;
+}
+.delivery-summary{
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px 8px;
+  margin-top:7px;
+  font-size:11px;
+  line-height:1.35;
+  color:#667085;
+}
+.delivery-summary span{
+  white-space:nowrap;
+}
+.delivery-summary .delivery-failed{
+  color:#c53030;
+  font-weight:700;
 }
 .campaign-delete-form .btn{
   display:block!important;
