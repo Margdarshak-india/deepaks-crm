@@ -431,7 +431,7 @@ function openSendModal(cid,name,lang,savedParams,savedMediaId){
     if(savedMediaId){
       media.innerHTML='<div style="margin-top:14px;padding:12px;border:1px solid #b7ead6;border-radius:10px;background:#effbf6;color:#087f5b;font-weight:700">✅ Saved '+type+' header media is ready.<div class="hint" style="margin-top:5px;color:#4b635a;font-weight:400">No re-upload is required. You can optionally choose a new file below to replace it.</div></div><label style="margin-top:12px">Replace '+type+' Header Media <span class="muted">(optional)</span></label><input type="file" id="sendHeaderMedia" name="header_media" onchange="uploadSendHeaderMedia(this)"><div id="sendMediaStatus" class="hint" style="margin-top:6px"></div>';
     } else {
-      media.innerHTML='<label style="margin-top:14px">'+type+' Header Media <span class="muted">(required for sending)</span></label><input type="file" id="sendHeaderMedia" name="header_media" required onchange="uploadSendHeaderMedia(this)"><div id="sendMediaStatus" class="hint" style="margin-top:6px"></div>';
+      media.innerHTML='<label style="margin-top:14px">'+type+' Header Media <span class="muted">(required for sending)</span></label><input type="file" id="sendHeaderMedia" name="header_media" onchange="uploadSendHeaderMedia(this)"><div id="sendMediaStatus" class="hint" style="margin-top:6px"></div>';
     }
   }
   let vars=[];
@@ -442,7 +442,7 @@ function openSendModal(cid,name,lang,savedParams,savedMediaId){
     varsBox.innerHTML='<div class="hint" style="margin-top:14px">Template variables are required when sending.</div>';
     vars.forEach((n,i)=>{
       const label=document.createElement('label'); label.style.marginTop='12px'; label.textContent='Variable {{'+n+'}}';
-      const input=document.createElement('input'); input.type='text'; input.className='send-variable-input'; input.dataset.number=n; input.required=true; input.value=(saved[i]||''); input.placeholder='Enter value for {{'+n+'}}';
+      const input=document.createElement('input'); input.type='text'; input.className='send-variable-input'; input.dataset.number=n; input.required=false; input.value=(saved[i]||''); input.placeholder='Enter value for {{'+n+'}}';
       input.addEventListener('input',updateSendParameters); varsBox.append(label,input);
     });
     updateSendParameters();
@@ -473,27 +473,72 @@ async function uploadSendHeaderMedia(input){
     document.getElementById('send_header_media_id').value=data.media_id||'';
     input.removeAttribute('required');
     if(status){status.textContent='✅ Media uploaded successfully. Media ID saved.';status.style.color='#087f5b';}
+    return true;
   }catch(e){
     document.getElementById('send_header_media_id').value='';
     if(status){status.textContent='❌ '+(e.message||'Media upload failed.');status.style.color='#c53030';}
+    return false;
   }finally{
     input.disabled=false;
     submit.disabled=false;
   }
 }
 
-document.addEventListener('submit',function(e){
+document.addEventListener('submit',async function(e){
   const form=e.target;
-  if(form && form.id==='sendForm'){
-    const mediaInput=document.getElementById('sendHeaderMedia');
-    const mediaId=document.getElementById('send_header_media_id').value.trim();
-    if(mediaInput && mediaInput.required && !mediaId){
-      e.preventDefault();
-      const status=document.getElementById('sendMediaStatus');
-      if(status)status.textContent='❌ Please select the required header media and wait for the upload to finish.';
-      return false;
+  if(!form || form.id!=='sendForm') return;
+  e.preventDefault();
+
+  const btn=document.getElementById('sendSubmitBtn');
+  const status=document.getElementById('sendMediaStatus');
+  const mediaInput=document.getElementById('sendHeaderMedia');
+  const mediaIdInput=document.getElementById('send_header_media_id');
+  const mode=document.getElementById('send_mode').value;
+  const scheduled=document.getElementById('scheduled_at');
+
+  // Validate schedule manually so browser native validation cannot block the submit handler.
+  if(mode==='schedule'){
+    if(!scheduled || !scheduled.value){
+      alert('Please select the schedule date and time.');
+      return;
+    }
+    if(new Date(scheduled.value).getTime() < Date.now() - 60000){
+      alert('Scheduled date and time must be in the future.');
+      return;
     }
   }
+
+  // Validate all template variables manually.
+  const variableInputs=[...document.querySelectorAll('.send-variable-input')];
+  for(const input of variableInputs){
+    if(!String(input.value||'').trim()){
+      input.focus();
+      alert('Please fill all template variables before sending.');
+      return;
+    }
+  }
+  updateSendParameters();
+
+  // If this template needs media and there is no saved Media ID, upload the selected
+  // file now. This happens before the actual send POST, so the send button never gets
+  // blocked by HTML5 `required` validation.
+  if(mediaInput){
+    const hasMediaId=String(mediaIdInput.value||'').trim();
+    if(!hasMediaId){
+      if(!mediaInput.files || !mediaInput.files[0]){
+        if(status){status.textContent='❌ Please select the required header media.';status.style.color='#c53030';}
+        mediaInput.focus();
+        return;
+      }
+      const ok=await uploadSendHeaderMedia(mediaInput);
+      if(!ok || !String(mediaIdInput.value||'').trim()) return;
+    }
+  }
+
+  btn.disabled=true;
+  btn.textContent=mode==='schedule'?'⏳ Scheduling...':'⏳ Sending...';
+  // Bypass this submit listener after all validation/media upload is complete.
+  HTMLFormElement.prototype.submit.call(form);
 });
 function istDateTimeLocalMin(){
   const now=new Date();
@@ -509,7 +554,7 @@ function sendModeChanged(){
   const btn=document.getElementById('sendSubmitBtn');
   const scheduled=mode==='schedule';
   box.style.display=scheduled?'block':'none';
-  input.required=scheduled;
+  input.required=false;
   if(scheduled){ input.min=istDateTimeLocalMin(); if(!input.value) input.value=input.min; btn.textContent='⏰ Schedule Send'; }
   else { btn.textContent='📤 Send Now'; }
 }
