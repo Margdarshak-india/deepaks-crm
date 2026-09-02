@@ -2,6 +2,16 @@
 {% block title %}Template Campaign - Margdarshak's CRM{% endblock %}
 {% block page_name %}Template Campaign{% endblock %}
 {% block content %}
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="flash-messages" style="margin:0 0 20px 0; display:flex; flex-direction:column; gap:10px;">
+      {% for message in messages %}
+        <div class="notice" style="margin:0; padding:14px 16px; border-radius:12px; font-weight:600;">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
 <div class="heading">
   <h1>Template Campaign</h1>
   <p>Create, verify and send approved WhatsApp templates.</p>
