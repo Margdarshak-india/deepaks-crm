@@ -1,6 +1,6 @@
 Render Cron Job setup
 
-Schedule (UTC): */1 * * * *
+Schedule (UTC): 0 * * * *
 Build Command: pip install -r requirements.txt
 Start Command: python render_cron.py
 
@@ -8,4 +8,6 @@ Environment variables:
 APP_BASE_URL = your live Render web-service URL
 SCHEDULER_SECRET = same long random secret on web service and Cron Job
 
-The cron runs every minute and calls the authenticated scheduler endpoint. Scheduled campaign times are selected in IST and stored in UTC in PostgreSQL.
+The cron runs every hour and calls the authenticated scheduler endpoint. Scheduled campaign times are selected in IST and stored in UTC in PostgreSQL.
+
+IMPORTANT: Template header media is uploaded to WhatsApp/Meta when the campaign is scheduled or sent and the returned Meta media ID is saved in PostgreSQL. The Cron worker reuses the saved media ID, so it does not depend on a local uploaded file.
