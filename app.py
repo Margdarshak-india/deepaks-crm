@@ -3839,6 +3839,7 @@ def template_campaigns():
             SELECT
                 tc.*,
                 COALESCE(SUM(CASE WHEN wm.status = 'accepted' THEN 1 ELSE 0 END), 0) AS delivery_accepted,
+                COALESCE(SUM(CASE WHEN wm.status IN ('accepted','sent') THEN 1 ELSE 0 END), 0) AS delivery_pending,
                 COALESCE(SUM(CASE WHEN wm.status = 'sent' THEN 1 ELSE 0 END), 0) AS delivery_sent,
                 COALESCE(SUM(CASE WHEN wm.status = 'delivered' THEN 1 ELSE 0 END), 0) AS delivery_delivered,
                 COALESCE(SUM(CASE WHEN wm.status = 'read' THEN 1 ELSE 0 END), 0) AS delivery_read,
