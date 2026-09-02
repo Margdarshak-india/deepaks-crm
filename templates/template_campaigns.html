@@ -429,9 +429,9 @@ function openSendModal(cid,name,lang,savedParams,savedMediaId){
   if(t && t.has_media_header){
     const type=(t.header_media_type||'media').toUpperCase();
     if(savedMediaId){
-      media.innerHTML='<div style="margin-top:14px;padding:12px;border:1px solid #b7ead6;border-radius:10px;background:#effbf6;color:#087f5b;font-weight:700">✅ Saved '+type+' header media is ready.<div class="hint" style="margin-top:5px;color:#4b635a;font-weight:400">No re-upload is required. You can optionally choose a new file below to replace it.</div></div><label style="margin-top:12px">Replace '+type+' Header Media <span class="muted">(optional)</span></label><input type="file" id="sendHeaderMedia" name="header_media" onchange="uploadSendHeaderMedia(this)"><div id="sendMediaStatus" class="hint" style="margin-top:6px"></div>';
+      media.innerHTML='<div style="margin-top:14px;padding:12px;border:1px solid #b7ead6;border-radius:10px;background:#effbf6;color:#087f5b;font-weight:700">✅ Saved '+type+' header media is ready.<div class="hint" style="margin-top:5px;color:#4b635a;font-weight:400">No re-upload is required. You can optionally choose a new file below to replace it.</div></div><label style="margin-top:12px">Replace '+type+' Header Media <span class="muted">(optional)</span></label><input type="file" id="sendHeaderMedia" name="header_media" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"><div id="sendMediaStatus" class="hint" style="margin-top:6px"></div>';
     } else {
-      media.innerHTML='<label style="margin-top:14px">'+type+' Header Media <span class="muted">(required for sending)</span></label><input type="file" id="sendHeaderMedia" name="header_media" onchange="uploadSendHeaderMedia(this)"><div id="sendMediaStatus" class="hint" style="margin-top:6px"></div>';
+      media.innerHTML='<label style="margin-top:14px">'+type+' Header Media <span class="muted">(required if no saved media exists)</span></label><input type="file" id="sendHeaderMedia" name="header_media" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"><div id="sendMediaStatus" class="hint" style="margin-top:6px">Choose the file and press Send. The server will upload it to WhatsApp and save its Media ID.</div>';
     }
   }
   let vars=[];
@@ -455,36 +455,13 @@ function updateSendParameters(){
 }
 
 async function uploadSendHeaderMedia(input){
-  const file=input && input.files && input.files[0];
-  const form=document.getElementById('sendForm');
-  const cid=form.dataset.campaignId;
-  const status=document.getElementById('sendMediaStatus');
-  const submit=document.getElementById('sendSubmitBtn');
-  if(!file || !cid) return;
-  const fd=new FormData();
-  fd.append('header_media',file);
-  input.disabled=true;
-  if(status){status.textContent='⏳ Uploading media to WhatsApp...';status.style.color='#8a5a00';}
-  submit.disabled=true;
-  try{
-    const r=await fetch('/template-campaign/'+cid+'/upload-media',{method:'POST',body:fd});
-    const data=await r.json().catch(()=>({ok:false,error:'Invalid server response'}));
-    if(!r.ok || !data.ok) throw new Error(data.error||'Media upload failed.');
-    document.getElementById('send_header_media_id').value=data.media_id||'';
-    input.removeAttribute('required');
-    if(status){status.textContent='✅ Media uploaded successfully. Media ID saved.';status.style.color='#087f5b';}
-    return true;
-  }catch(e){
-    document.getElementById('send_header_media_id').value='';
-    if(status){status.textContent='❌ '+(e.message||'Media upload failed.');status.style.color='#c53030';}
-    return false;
-  }finally{
-    input.disabled=false;
-    submit.disabled=false;
-  }
+  // Kept only for backward compatibility with older pages.  The current send
+  // flow does NOT depend on this AJAX upload; the multipart /send request is
+  // responsible for uploading and persisting the media server-side.
+  return !!(input && input.files && input.files[0]);
 }
 
-document.addEventListener('submit',async function(e){
+document.addEventListener('submit', function(e){
   const form=e.target;
   if(!form || form.id!=='sendForm') return;
   e.preventDefault();
@@ -496,19 +473,18 @@ document.addEventListener('submit',async function(e){
   const mode=document.getElementById('send_mode').value;
   const scheduled=document.getElementById('scheduled_at');
 
-  // Validate schedule manually so browser native validation cannot block the submit handler.
   if(mode==='schedule'){
     if(!scheduled || !scheduled.value){
       alert('Please select the schedule date and time.');
       return;
     }
-    if(new Date(scheduled.value).getTime() < Date.now() - 60000){
+    const selectedTime=new Date(scheduled.value).getTime();
+    if(!Number.isFinite(selectedTime) || selectedTime <= Date.now()){
       alert('Scheduled date and time must be in the future.');
       return;
     }
   }
 
-  // Validate all template variables manually.
   const variableInputs=[...document.querySelectorAll('.send-variable-input')];
   for(const input of variableInputs){
     if(!String(input.value||'').trim()){
@@ -519,27 +495,28 @@ document.addEventListener('submit',async function(e){
   }
   updateSendParameters();
 
-  // If this template needs media and there is no saved Media ID, upload the selected
-  // file now. This happens before the actual send POST, so the send button never gets
-  // blocked by HTML5 `required` validation.
-  if(mediaInput){
-    const hasMediaId=String(mediaIdInput.value||'').trim();
-    if(!hasMediaId){
-      if(!mediaInput.files || !mediaInput.files[0]){
-        if(status){status.textContent='❌ Please select the required header media.';status.style.color='#c53030';}
-        mediaInput.focus();
-        return;
-      }
-      const ok=await uploadSendHeaderMedia(mediaInput);
-      if(!ok || !String(mediaIdInput.value||'').trim()) return;
+  // Do not use HTML5 required validation and do not upload media through a
+  // second AJAX request. The selected file stays in the multipart form and is
+  // processed by Flask in the same request as Send/Schedule.
+  if(mediaInput && mediaInput.files && mediaInput.files[0]){
+    if(status){
+      status.textContent='📤 Media attached. It will be uploaded to WhatsApp when you send.';
+      status.style.color='#087f5b';
+    }
+  } else if(mediaIdInput && String(mediaIdInput.value||'').trim()){
+    if(status){
+      status.textContent='✅ Saved WhatsApp media will be used.';
+      status.style.color='#087f5b';
     }
   }
 
   btn.disabled=true;
   btn.textContent=mode==='schedule'?'⏳ Scheduling...':'⏳ Sending...';
-  // Bypass this submit listener after all validation/media upload is complete.
-  HTMLFormElement.prototype.submit.call(form);
+
+  // Native form submission preserves multipart/form-data including the file.
+  form.submit();
 });
+
 function istDateTimeLocalMin(){
   const now=new Date();
   const utc=now.getTime()+(now.getTimezoneOffset()*60000);
