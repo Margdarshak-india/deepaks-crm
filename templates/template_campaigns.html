@@ -220,7 +220,7 @@
           <td>
             {% if c.status=='Approved' %}
               <button class="btn green" type="button"
-                      onclick="openSendModal({{ c.id }}, '{{ c.template_name|e }}', '{{ c.template_language|e }}', '{{ c.parameters|default('', true)|e }}')">📤 Send Campaign</button>
+                      onclick="openSendModal({{ c.id }}, {{ c.template_name|tojson }}, {{ c.template_language|tojson }}, {{ c.parameters|default('', true)|tojson }}, {{ (c.header_media_id or '')|tojson }})">📤 Send Campaign</button>
             {% elif c.status=='Scheduled' %}
               <span class="badge warning">⏰ Waiting</span>
             {% elif c.status=='Sending' %}
@@ -407,7 +407,7 @@ function addNumberOnEnter(e){if(e.key==='Enter'){e.preventDefault();addManualNum
 
 function findMetaTemplate(name,lang){return META_TEMPLATES.find(t=>t.name===name && t.language===lang)||null}
 
-function openSendModal(cid,name,lang,savedParams){
+function openSendModal(cid,name,lang,savedParams,savedMediaId){
   const form=document.getElementById('sendForm');
   const media=document.getElementById('sendMediaContainer');
   const varsBox=document.getElementById('sendVariablesContainer');
@@ -424,7 +424,11 @@ function openSendModal(cid,name,lang,savedParams){
   varsBox.innerHTML='';
   if(t && t.has_media_header){
     const type=(t.header_media_type||'media').toUpperCase();
-    media.innerHTML='<label style="margin-top:14px">'+type+' Header Media <span class="muted">(required for sending)</span></label><input type="file" name="header_media" required>';
+    if(savedMediaId){
+      media.innerHTML='<div class="saved-media-note" style="margin-top:14px;padding:12px 14px;border-radius:10px;background:#eefaf3;border:1px solid #b8e6c8;color:#176b3a"><strong>✓ '+type+' header media already saved</strong><div class="hint" style="margin-top:4px;color:#176b3a">The saved WhatsApp/Meta media will be used. You do not need to upload it again.</div></div><label style="margin-top:12px">Replace '+type+' header media <span class="muted">(optional)</span></label><input type="file" name="header_media" accept="'+(type==='IMAGE'?'.jpg,.jpeg,.png':type==='VIDEO'?'.mp4,.3gp':'.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt')+'">';
+    } else {
+      media.innerHTML='<label style="margin-top:14px">'+type+' Header Media <span class="muted">(required for sending)</span></label><input type="file" name="header_media" required><div class="hint" style="margin-top:5px">Upload once. The WhatsApp/Meta media ID will be saved for future scheduled sends.</div>';
+    }
   }
   let vars=[];
   try{vars=(t&&t.variables)||[]}catch(e){vars=[]}
