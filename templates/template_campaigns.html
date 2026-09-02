@@ -219,8 +219,12 @@
           </td>
           <td>
             {% if c.status=='Approved' %}
-              <button class="btn green" type="button"
-                      onclick="openSendModal({{ c.id }}, {{ c.template_name|tojson }}, {{ c.template_language|tojson }}, {{ c.parameters|default('', true)|tojson }}, {{ c.header_media_id|default('', true)|tojson }})">📤 Send Campaign</button>
+              <button class="btn green send-campaign-btn" type="button"
+                      data-cid="{{ c.id }}"
+                      data-template-name="{{ c.template_name|e }}"
+                      data-template-language="{{ c.template_language|e }}"
+                      data-parameters="{{ c.parameters|default('', true)|e }}"
+                      data-header-media-id="{{ c.header_media_id|default('', true)|e }}">📤 Send Campaign</button>
             {% elif c.status=='Scheduled' %}
               <span class="badge warning">⏰ Waiting</span>
             {% elif c.status=='Sending' %}
@@ -583,6 +587,31 @@ function sendModeChanged(){
 }
 function closeSendModal(){document.getElementById('sendModal').style.display='none'}
 
-document.addEventListener('DOMContentLoaded',()=>{loadTypedNumberHistory();targetChanged();const input=document.getElementById('manual_number');if(input)input.addEventListener('keydown',addNumberOnEnter);});
+document.addEventListener('DOMContentLoaded',()=>{
+  loadTypedNumberHistory();
+  targetChanged();
+  const input=document.getElementById('manual_number');
+  if(input) input.addEventListener('keydown',addNumberOnEnter);
+
+  // Use a delegated click handler instead of inline onclick. This prevents
+  // HTML/Jinja quoting issues from making Send Campaign appear unresponsive.
+  document.addEventListener('click',(event)=>{
+    const btn=event.target.closest('.send-campaign-btn');
+    if(!btn) return;
+    event.preventDefault();
+    try{
+      openSendModal(
+        Number(btn.dataset.cid),
+        btn.dataset.templateName || '',
+        btn.dataset.templateLanguage || '',
+        btn.dataset.parameters || '',
+        btn.dataset.headerMediaId || ''
+      );
+    }catch(err){
+      console.error('OPEN SEND MODAL ERROR:',err);
+      alert('Send Campaign could not be opened: '+(err && err.message ? err.message : err));
+    }
+  });
+});
 </script>
 {% endblock %}
