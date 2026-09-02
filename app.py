@@ -3724,6 +3724,7 @@ def template_campaigns():
 
         # Optional template-header media upload.
         header_media_path = ""
+        header_media_id = ""
         header_media_type = selected.get("header_media_type", "")
 
         uploaded_media = request.files.get("header_media")
@@ -3755,6 +3756,19 @@ def template_campaigns():
             safe_name = f"{secrets.token_hex(8)}_{filename}"
             header_media_path = os.path.join(upload_dir, safe_name)
             uploaded_media.save(header_media_path)
+
+            # Persist the Meta/WhatsApp media ID now. Local Render storage can
+            # disappear after a restart, so scheduled sends must use this ID.
+            header_media_id, media_error = upload_whatsapp_media(
+                header_media_path, header_media_type
+            )
+            if not header_media_id:
+                try:
+                    os.remove(header_media_path)
+                except Exception:
+                    pass
+                flash(f"Template header media upload failed: {media_error}")
+                return redirect(url_for("template_campaigns"))
 
         # Media is intentionally optional while saving. If it is not supplied,
         # the Send dialog will request it later when the template requires it.
@@ -3789,9 +3803,9 @@ def template_campaigns():
                 INSERT INTO template_campaigns
                 (name, template_name, template_language, target_type,
                  group_name, manual_number, parameters, status,
-                 header_image_path, header_media_path, header_media_type,
+                 header_image_path, header_media_path, header_media_type, header_media_id,
                  selected_contact_ids, manual_numbers, typed_numbers)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 name,
                 template_name,
@@ -3804,6 +3818,7 @@ def template_campaigns():
                 header_media_path if header_media_type == "image" else None,
                 header_media_path or None,
                 header_media_type or None,
+                header_media_id or None,
                 json.dumps(selected_contact_ids) if selected_contact_ids else None,
                 json.dumps(manual_numbers) if manual_numbers else None,
                 json.dumps(typed_numbers) if typed_numbers else None
