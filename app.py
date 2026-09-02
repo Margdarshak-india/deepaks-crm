@@ -2656,24 +2656,85 @@ def webhook_receive():
                             ensure_ascii=False
                         )
 
-                    if wa_id:
+                    if wa_id and new_status:
 
-                        c.execute(
+                        # Keep the most advanced/final WhatsApp status.
+                        # Webhook events can occasionally arrive out of order.
+                        status_rank = {
+                            "queued": 0,
+                            "accepted": 1,
+                            "sent": 2,
+                            "delivered": 3,
+                            "read": 4,
+                            "failed": 4,
+                        }
+
+                        current_row = c.execute(
                             """
-                            UPDATE whatsapp_messages
-                            SET
-                                status = ?,
-                                error = ?,
-                                updated_at =
-                                    CURRENT_TIMESTAMP
+                            SELECT status
+                            FROM whatsapp_messages
                             WHERE wa_message_id = ?
                             """,
-                            (
-                                new_status,
-                                error_text,
-                                wa_id
-                            )
+                            (wa_id,)
+                        ).fetchone()
+
+                        current_status = (
+                            current_row["status"]
+                            if current_row else None
                         )
+
+                        current_rank = status_rank.get(
+                            str(current_status or "").lower(),
+                            -1
+                        )
+
+                        incoming_rank = status_rank.get(
+                            str(new_status).lower(),
+                            -1
+                        )
+
+                        should_update = (
+                            current_row is None
+                            or incoming_rank >= current_rank
+                            or str(new_status).lower() == "failed"
+                        )
+
+                        if should_update:
+                            result = c.execute(
+                                """
+                                UPDATE whatsapp_messages
+                                SET
+                                    status = ?,
+                                    error = ?,
+                                    updated_at =
+                                        CURRENT_TIMESTAMP
+                                WHERE wa_message_id = ?
+                                """,
+                                (
+                                    str(new_status).lower(),
+                                    error_text,
+                                    wa_id
+                                )
+                            )
+
+                            print(
+                                "WEBHOOK STATUS UPDATE:",
+                                wa_id,
+                                current_status,
+                                "->",
+                                new_status,
+                                "rows=",
+                                result.rowcount
+                            )
+                        else:
+                            print(
+                                "WEBHOOK STATUS IGNORED:",
+                                wa_id,
+                                current_status,
+                                "->",
+                                new_status
+                            )
+
 
                 # =================================================
                 # INCOMING MESSAGES
@@ -4123,9 +4184,45 @@ def perform_template_campaign_send(cid, prepared=None):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (cid, contact.get("id"), phone, "[Template] " + campaign["template_name"], message_id, "outgoing", status, error_text))
 
-        c.execute("UPDATE template_campaigns SET status = ?, scheduled_at = scheduled_at WHERE id = ?", ("Completed", cid))
+        # API "accepted" is not final delivery. Keep the campaign in
+        # Sending/Pending until every recipient receives a final webhook
+        # status (delivered/read/failed).
+        pending_row = c.execute(
+            """
+            SELECT COUNT(*) AS n
+            FROM whatsapp_messages
+            WHERE campaign_id = ?
+              AND status IN ('queued', 'accepted', 'sent')
+            """,
+            (cid,)
+        ).fetchone()
+
+        pending_count = int(
+            (pending_row["n"] if pending_row else 0) or 0
+        )
+
+        final_status = (
+            "Sending"
+            if pending_count > 0
+            else "Completed"
+        )
+
+        c.execute(
+            "UPDATE template_campaigns SET status = ?, scheduled_at = scheduled_at WHERE id = ?",
+            (final_status, cid)
+        )
         c.commit()
-        return True, f"Template campaign completed: {sent} accepted, {failed} failed."
+
+        if pending_count > 0:
+            return True, (
+                f"Template campaign submitted: {sent} accepted, "
+                f"{failed} failed, {pending_count} pending webhook status."
+            )
+
+        return True, (
+            f"Template campaign completed: {sent} accepted, "
+            f"{failed} failed."
+        )
     except Exception as e:
         c.rollback()
         try:
