@@ -276,6 +276,7 @@
       <div id="sendMediaContainer"></div>
       <div id="sendVariablesContainer"></div>
       <input type="hidden" id="send_parameters" name="parameters" value="">
+      <input type="hidden" id="send_header_media_id" name="header_media_id" value="">
 
       <div style="display:flex;gap:10px;margin-top:16px">
         <button class="btn green" id="sendSubmitBtn" type="submit">📤 Send Now</button>
@@ -412,22 +413,25 @@ function openSendModal(cid,name,lang,savedParams,savedMediaId){
   const media=document.getElementById('sendMediaContainer');
   const varsBox=document.getElementById('sendVariablesContainer');
   const params=document.getElementById('send_parameters');
+  const mediaIdInput=document.getElementById('send_header_media_id');
   const t=findMetaTemplate(name,lang);
   form.action='/template-campaign/'+cid+'/send';
+  form.dataset.campaignId=cid;
   document.getElementById('sendTemplateTitle').textContent=name+' — '+lang;
   const mode=document.getElementById('send_mode');
   mode.value='now';
   document.getElementById('scheduled_at').value='';
   sendModeChanged();
   params.value=savedParams||'';
+  mediaIdInput.value=savedMediaId||'';
   media.innerHTML='';
   varsBox.innerHTML='';
   if(t && t.has_media_header){
     const type=(t.header_media_type||'media').toUpperCase();
     if(savedMediaId){
-      media.innerHTML='<div style="margin-top:14px;padding:12px;border:1px solid #b7ead6;border-radius:10px;background:#effbf6;color:#087f5b;font-weight:700">✅ Saved '+type+' header media is ready.<div class="hint" style="margin-top:5px;color:#4b635a;font-weight:400">No re-upload is required. You can optionally choose a new file below to replace it.</div></div><label style="margin-top:12px">Replace '+type+' Header Media <span class="muted">(optional)</span></label><input type="file" name="header_media">';
+      media.innerHTML='<div style="margin-top:14px;padding:12px;border:1px solid #b7ead6;border-radius:10px;background:#effbf6;color:#087f5b;font-weight:700">✅ Saved '+type+' header media is ready.<div class="hint" style="margin-top:5px;color:#4b635a;font-weight:400">No re-upload is required. You can optionally choose a new file below to replace it.</div></div><label style="margin-top:12px">Replace '+type+' Header Media <span class="muted">(optional)</span></label><input type="file" id="sendHeaderMedia" name="header_media" onchange="uploadSendHeaderMedia(this)"><div id="sendMediaStatus" class="hint" style="margin-top:6px"></div>';
     } else {
-      media.innerHTML='<label style="margin-top:14px">'+type+' Header Media <span class="muted">(required for sending)</span></label><input type="file" name="header_media" required>';
+      media.innerHTML='<label style="margin-top:14px">'+type+' Header Media <span class="muted">(required for sending)</span></label><input type="file" id="sendHeaderMedia" name="header_media" required onchange="uploadSendHeaderMedia(this)"><div id="sendMediaStatus" class="hint" style="margin-top:6px"></div>';
     }
   }
   let vars=[];
@@ -449,6 +453,48 @@ function updateSendParameters(){
   const a=[...document.querySelectorAll('.send-variable-input')].sort((x,y)=>Number(x.dataset.number)-Number(y.dataset.number));
   document.getElementById('send_parameters').value=a.map(x=>x.value.trim()).join('||');
 }
+
+async function uploadSendHeaderMedia(input){
+  const file=input && input.files && input.files[0];
+  const form=document.getElementById('sendForm');
+  const cid=form.dataset.campaignId;
+  const status=document.getElementById('sendMediaStatus');
+  const submit=document.getElementById('sendSubmitBtn');
+  if(!file || !cid) return;
+  const fd=new FormData();
+  fd.append('header_media',file);
+  input.disabled=true;
+  if(status){status.textContent='⏳ Uploading media to WhatsApp...';status.style.color='#8a5a00';}
+  submit.disabled=true;
+  try{
+    const r=await fetch('/template-campaign/'+cid+'/upload-media',{method:'POST',body:fd});
+    const data=await r.json().catch(()=>({ok:false,error:'Invalid server response'}));
+    if(!r.ok || !data.ok) throw new Error(data.error||'Media upload failed.');
+    document.getElementById('send_header_media_id').value=data.media_id||'';
+    input.removeAttribute('required');
+    if(status){status.textContent='✅ Media uploaded successfully. Media ID saved.';status.style.color='#087f5b';}
+  }catch(e){
+    document.getElementById('send_header_media_id').value='';
+    if(status){status.textContent='❌ '+(e.message||'Media upload failed.');status.style.color='#c53030';}
+  }finally{
+    input.disabled=false;
+    submit.disabled=false;
+  }
+}
+
+document.addEventListener('submit',function(e){
+  const form=e.target;
+  if(form && form.id==='sendForm'){
+    const mediaInput=document.getElementById('sendHeaderMedia');
+    const mediaId=document.getElementById('send_header_media_id').value.trim();
+    if(mediaInput && mediaInput.required && !mediaId){
+      e.preventDefault();
+      const status=document.getElementById('sendMediaStatus');
+      if(status)status.textContent='❌ Please select the required header media and wait for the upload to finish.';
+      return false;
+    }
+  }
+});
 function istDateTimeLocalMin(){
   const now=new Date();
   const utc=now.getTime()+(now.getTimezoneOffset()*60000);
