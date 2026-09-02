@@ -41,6 +41,7 @@
   <h2>✨ Create Template Campaign</h2>
   <div class="notice" style="margin:14px 0">
     Only <strong>APPROVED</strong> templates can be sent.
+    <br><span class="muted">Accepted means WhatsApp has accepted the request; final delivery status comes from WhatsApp webhook updates.</span>
   </div>
 
   <form method="POST"
@@ -222,6 +223,7 @@
             {% if c.delivery_total|default(0) > 0 %}
               <div class="delivery-summary">
                 <span>Accepted {{ c.delivery_accepted|default(0) }}</span>
+                <span>Pending {{ c.delivery_pending|default(0) }}</span>
                 <span>Sent {{ c.delivery_sent|default(0) }}</span>
                 <span>Delivered {{ c.delivery_delivered|default(0) }}</span>
                 <span>Read {{ c.delivery_read|default(0) }}</span>
