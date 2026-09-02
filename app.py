@@ -3959,6 +3959,18 @@ def _prepare_template_campaign_send(cid, request_form=None, request_files=None):
         header_media_id = None
         header_media_type = selected.get("header_media_type", "")
         if selected.get("has_media_header"):
+            # Prefer a Media ID already uploaded/saved for this campaign.
+            # The browser also sends this hidden value after an AJAX media upload.
+            requested_media_id = str(request_form.get("header_media_id") or "").strip()
+            if requested_media_id:
+                header_media_id = requested_media_id
+                c.execute(
+                    "UPDATE template_campaigns SET header_media_id = ?, header_media_type = ? WHERE id = ?",
+                    (header_media_id, header_media_type, cid)
+                )
+                c.commit()
+                return campaign, selected, values, header_media_id, header_media_type, None
+
             uploaded_media = request_files.get("header_media")
             media_path = None
             if not uploaded_media and campaign.get("header_media_id"):
@@ -4004,9 +4016,12 @@ def _prepare_template_campaign_send(cid, request_form=None, request_files=None):
         c.close()
 
 
-def perform_template_campaign_send(cid):
-    """Send a saved campaign. Used by both Send Now and the persistent scheduler."""
-    campaign, selected, values, header_media_id, header_media_type, error = _prepare_template_campaign_send(cid)
+def perform_template_campaign_send(cid, prepared=None):
+    """Send a saved campaign. If prepared is supplied, reuse send-time media/variables."""
+    if prepared is None:
+        campaign, selected, values, header_media_id, header_media_type, error = _prepare_template_campaign_send(cid)
+    else:
+        campaign, selected, values, header_media_id, header_media_type, error = prepared
     if error:
         c = db()
         try:
@@ -4074,6 +4089,66 @@ def perform_template_campaign_send(cid):
         c.close()
 
 
+@app.route("/template-campaign/<int:cid>/upload-media", methods=["POST"])
+def upload_template_campaign_media(cid):
+    """Upload template header media to Meta and persist its Media ID for this campaign."""
+    uploaded_media = request.files.get("header_media")
+    if not uploaded_media or not uploaded_media.filename:
+        return jsonify({"ok": False, "error": "Please choose an image/media file."}), 400
+
+    c = db()
+    try:
+        campaign = c.execute("SELECT * FROM template_campaigns WHERE id = ?", (cid,)).fetchone()
+        if not campaign:
+            return jsonify({"ok": False, "error": "Template campaign not found."}), 404
+
+        templates, error = fetch_meta_templates()
+        if error:
+            return jsonify({"ok": False, "error": f"Meta template check failed: {error}"}), 400
+
+        selected = next((x for x in templates if x["name"] == campaign["template_name"] and x["language"] == campaign["template_language"]), None)
+        if not selected or selected["status"].upper() != "APPROVED":
+            return jsonify({"ok": False, "error": "Template is not approved."}), 400
+        if not selected.get("has_media_header"):
+            return jsonify({"ok": False, "error": "This template does not require header media."}), 400
+
+        header_media_type = selected.get("header_media_type", "")
+        filename = secure_filename(uploaded_media.filename)
+        ext = os.path.splitext(filename)[1].lower()
+        allowed = {
+            "image": {".jpg", ".jpeg", ".png"},
+            "video": {".mp4", ".3gp"},
+            "document": {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt"}
+        }
+        if not filename or ext not in allowed.get(header_media_type, set()):
+            return jsonify({"ok": False, "error": f"Please upload a valid {header_media_type.upper()} file."}), 400
+
+        upload_dir = os.path.join("static", "uploads", "template_headers")
+        os.makedirs(upload_dir, exist_ok=True)
+        media_path = os.path.join(upload_dir, f"{secrets.token_hex(8)}_{filename}")
+        uploaded_media.save(media_path)
+
+        media_id, media_error = upload_whatsapp_media(media_path, header_media_type)
+        if not media_id:
+            try:
+                os.remove(media_path)
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": f"Meta media upload failed: {media_error}"}), 400
+
+        c.execute(
+            "UPDATE template_campaigns SET header_media_path = ?, header_image_path = ?, header_media_type = ?, header_media_id = ? WHERE id = ?",
+            (media_path, media_path if header_media_type == "image" else campaign["header_image_path"], header_media_type, str(media_id), cid)
+        )
+        c.commit()
+        return jsonify({"ok": True, "media_id": str(media_id), "media_type": header_media_type})
+    except Exception as e:
+        c.rollback()
+        return jsonify({"ok": False, "error": f"Media upload error: {e}"}), 500
+    finally:
+        c.close()
+
+
 @app.route("/template-campaign/<int:cid>/send", methods=["POST"])
 def send_template_campaign(cid):
     mode = (request.form.get("send_mode") or "now").strip().lower()
@@ -4114,7 +4189,15 @@ def send_template_campaign(cid):
             c.close()
         return redirect(url_for("template_campaigns"))
 
-    ok, message = perform_template_campaign_send(cid)
+    # Send Now must process the uploaded header media from this request before sending.
+    # Previously the route discarded request.files, so an uploaded IMAGE was never
+    # passed to the media-preparation step and the app asked for the image again.
+    prepared = _prepare_template_campaign_send(cid, request.form, request.files)
+    campaign, selected, values, header_media_id, header_media_type, error = prepared
+    if error:
+        flash(error)
+        return redirect(url_for("template_campaigns"))
+    ok, message = perform_template_campaign_send(cid, prepared=prepared)
     flash(message)
     return redirect(url_for("template_campaigns"))
 
