@@ -220,7 +220,7 @@
           <td>
             {% if c.status=='Approved' %}
               <button class="btn green" type="button"
-                      onclick="openSendModal({{ c.id }}, '{{ c.template_name|e }}', '{{ c.template_language|e }}', '{{ c.parameters|default('', true)|e }}')">📤 Send Campaign</button>
+                      onclick="openSendModal({{ c.id }}, {{ c.template_name|tojson }}, {{ c.template_language|tojson }}, {{ c.parameters|default('', true)|tojson }}, {{ c.header_media_id|default('', true)|tojson }})">📤 Send Campaign</button>
             {% elif c.status=='Scheduled' %}
               <span class="badge warning">⏰ Waiting</span>
             {% elif c.status=='Sending' %}
@@ -407,7 +407,7 @@ function addNumberOnEnter(e){if(e.key==='Enter'){e.preventDefault();addManualNum
 
 function findMetaTemplate(name,lang){return META_TEMPLATES.find(t=>t.name===name && t.language===lang)||null}
 
-function openSendModal(cid,name,lang,savedParams){
+function openSendModal(cid,name,lang,savedParams,savedMediaId){
   const form=document.getElementById('sendForm');
   const media=document.getElementById('sendMediaContainer');
   const varsBox=document.getElementById('sendVariablesContainer');
@@ -424,7 +424,11 @@ function openSendModal(cid,name,lang,savedParams){
   varsBox.innerHTML='';
   if(t && t.has_media_header){
     const type=(t.header_media_type||'media').toUpperCase();
-    media.innerHTML='<label style="margin-top:14px">'+type+' Header Media <span class="muted">(required for sending)</span></label><input type="file" name="header_media" required>';
+    if(savedMediaId){
+      media.innerHTML='<div style="margin-top:14px;padding:12px;border:1px solid #b7ead6;border-radius:10px;background:#effbf6;color:#087f5b;font-weight:700">✅ Saved '+type+' header media is ready.<div class="hint" style="margin-top:5px;color:#4b635a;font-weight:400">No re-upload is required. You can optionally choose a new file below to replace it.</div></div><label style="margin-top:12px">Replace '+type+' Header Media <span class="muted">(optional)</span></label><input type="file" name="header_media">';
+    } else {
+      media.innerHTML='<label style="margin-top:14px">'+type+' Header Media <span class="muted">(required for sending)</span></label><input type="file" name="header_media" required>';
+    }
   }
   let vars=[];
   try{vars=(t&&t.variables)||[]}catch(e){vars=[]}
