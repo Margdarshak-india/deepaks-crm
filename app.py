@@ -3928,7 +3928,14 @@ def delete_template_campaign(cid):
 
 
 def _prepare_template_campaign_send(cid, request_form=None, request_files=None):
-    """Validate and persist send-time variables/media. Returns (campaign, selected, values, media_id, media_type, error)."""
+    """Prepare a campaign for immediate or scheduled sending.
+
+    Media is handled server-side from the multipart send request.  This is
+    intentionally independent of browser JavaScript so an IMAGE/VIDEO/DOCUMENT
+    file cannot be lost between the file picker and the actual send request.
+    Once Meta returns a media ID it is persisted on the campaign and reused by
+    future sends/scheduled jobs.
+    """
     request_form = request_form or {}
     request_files = request_files or {}
     c = db()
@@ -3941,7 +3948,12 @@ def _prepare_template_campaign_send(cid, request_form=None, request_files=None):
         if error:
             return campaign, None, None, None, None, f"Meta template check failed: {error}"
 
-        selected = next((x for x in templates if x["name"] == campaign["template_name"] and x["language"] == campaign["template_language"]), None)
+        selected = next(
+            (x for x in templates
+             if x["name"] == campaign["template_name"]
+             and x["language"] == campaign["template_language"]),
+            None
+        )
         if not selected or selected["status"].upper() != "APPROVED":
             return campaign, None, None, None, None, "Template is not approved. Sending is disabled."
 
@@ -3953,30 +3965,18 @@ def _prepare_template_campaign_send(cid, request_form=None, request_files=None):
             values = raw_parameters.split("||") if raw_parameters else []
 
         expected_count = int(selected.get("variable_count", 0) or 0)
-        if expected_count and (len(values) != expected_count or any(not x.strip() for x in values)):
+        if expected_count and (len(values) != expected_count or any(not str(x).strip() for x in values)):
             return campaign, selected, None, None, None, f"Before sending, please fill all {expected_count} template variable(s)."
 
-        header_media_id = None
+        header_media_id = str(request_form.get("header_media_id") or campaign["header_media_id"] or "").strip()
         header_media_type = selected.get("header_media_type", "")
-        if selected.get("has_media_header"):
-            # Prefer a Media ID already uploaded/saved for this campaign.
-            # The browser also sends this hidden value after an AJAX media upload.
-            requested_media_id = str(request_form.get("header_media_id") or "").strip()
-            if requested_media_id:
-                header_media_id = requested_media_id
-                c.execute(
-                    "UPDATE template_campaigns SET header_media_id = ?, header_media_type = ? WHERE id = ?",
-                    (header_media_id, header_media_type, cid)
-                )
-                c.commit()
-                return campaign, selected, values, header_media_id, header_media_type, None
 
+        if selected.get("has_media_header"):
+            # 1) If a NEW file is attached to this send request, it always wins.
+            # This is the most reliable path because Flask receives the actual
+            # multipart file on the same request that performs Send/Schedule.
             uploaded_media = request_files.get("header_media")
-            media_path = None
-            if not uploaded_media and campaign.get("header_media_id"):
-                header_media_id = str(campaign["header_media_id"])
-                return campaign, selected, values, header_media_id, header_media_type, None
-            if uploaded_media and uploaded_media.filename:
+            if uploaded_media and getattr(uploaded_media, "filename", ""):
                 filename = secure_filename(uploaded_media.filename)
                 ext = os.path.splitext(filename)[1].lower()
                 allowed = {
@@ -3986,23 +3986,59 @@ def _prepare_template_campaign_send(cid, request_form=None, request_files=None):
                 }
                 if not filename or ext not in allowed.get(header_media_type, set()):
                     return campaign, selected, None, None, None, f"Please upload a valid {header_media_type.upper()} file before sending."
+
                 upload_dir = os.path.join("static", "uploads", "template_headers")
                 os.makedirs(upload_dir, exist_ok=True)
                 media_path = os.path.join(upload_dir, f"{secrets.token_hex(8)}_{filename}")
-                uploaded_media.save(media_path)
+                try:
+                    uploaded_media.save(media_path)
+                except Exception as e:
+                    return campaign, selected, None, None, None, f"Could not save uploaded media: {e}"
+
+                new_media_id, media_error = upload_whatsapp_media(media_path, header_media_type)
+                if not new_media_id:
+                    try:
+                        os.remove(media_path)
+                    except Exception:
+                        pass
+                    return campaign, selected, None, None, None, f"Template header media upload failed: {media_error}"
+
+                header_media_id = str(new_media_id)
+                c.execute(
+                    "UPDATE template_campaigns SET header_media_path = ?, header_image_path = ?, header_media_type = ?, header_media_id = ?, parameters = ? WHERE id = ?",
+                    (
+                        media_path,
+                        media_path if header_media_type == "image" else campaign["header_image_path"],
+                        header_media_type,
+                        header_media_id,
+                        send_parameters or campaign["parameters"],
+                        cid,
+                    )
+                )
+
+            # 2) No new file: a previously saved Meta media ID is sufficient.
+            elif header_media_id:
+                c.execute(
+                    "UPDATE template_campaigns SET header_media_id = ?, header_media_type = ?, parameters = ? WHERE id = ?",
+                    (header_media_id, header_media_type, send_parameters or campaign["parameters"], cid)
+                )
+
+            # 3) Legacy campaign: if it has a surviving local file, upload it once
+            # and persist the resulting Meta ID. Do NOT require local storage when
+            # a Meta ID already exists.
             else:
                 media_path = campaign["header_media_path"] or campaign["header_image_path"]
-                if not media_path or not os.path.exists(media_path):
+                if media_path and os.path.exists(media_path):
+                    new_media_id, media_error = upload_whatsapp_media(media_path, header_media_type)
+                    if not new_media_id:
+                        return campaign, selected, None, None, None, f"Template header media upload failed: {media_error}"
+                    header_media_id = str(new_media_id)
+                    c.execute(
+                        "UPDATE template_campaigns SET header_media_id = ?, header_media_type = ?, parameters = ? WHERE id = ?",
+                        (header_media_id, header_media_type, send_parameters or campaign["parameters"], cid)
+                    )
+                else:
                     return campaign, selected, None, None, None, f"Please upload the required {header_media_type.upper()} header media before sending."
-
-            header_media_id, media_error = upload_whatsapp_media(media_path, header_media_type)
-            if not header_media_id:
-                return campaign, selected, None, None, None, f"Template header media upload failed: {media_error}"
-
-            c.execute(
-                "UPDATE template_campaigns SET header_media_path = ?, header_image_path = ?, header_media_type = ?, header_media_id = ?, parameters = ? WHERE id = ?",
-                (media_path, media_path if header_media_type == "image" else campaign["header_image_path"], header_media_type, header_media_id, send_parameters or campaign["parameters"], cid)
-            )
         elif send_parameters:
             c.execute("UPDATE template_campaigns SET parameters = ? WHERE id = ?", (send_parameters, cid))
 
