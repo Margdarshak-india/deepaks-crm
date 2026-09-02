@@ -3835,9 +3835,21 @@ def template_campaigns():
 
     c = db()
     try:
-        campaigns_list = c.execute(
-            "SELECT * FROM template_campaigns ORDER BY id DESC"
-        ).fetchall()
+        campaigns_list = c.execute("""
+            SELECT
+                tc.*,
+                COALESCE(SUM(CASE WHEN wm.status = 'accepted' THEN 1 ELSE 0 END), 0) AS delivery_accepted,
+                COALESCE(SUM(CASE WHEN wm.status = 'sent' THEN 1 ELSE 0 END), 0) AS delivery_sent,
+                COALESCE(SUM(CASE WHEN wm.status = 'delivered' THEN 1 ELSE 0 END), 0) AS delivery_delivered,
+                COALESCE(SUM(CASE WHEN wm.status = 'read' THEN 1 ELSE 0 END), 0) AS delivery_read,
+                COALESCE(SUM(CASE WHEN wm.status = 'failed' THEN 1 ELSE 0 END), 0) AS delivery_failed,
+                COUNT(wm.id) AS delivery_total
+            FROM template_campaigns tc
+            LEFT JOIN whatsapp_messages wm
+                ON wm.campaign_id = tc.id
+            GROUP BY tc.id
+            ORDER BY tc.id DESC
+        """).fetchall()
 
         groups = [
             x["group_name"]
@@ -4108,7 +4120,7 @@ def perform_template_campaign_send(cid, prepared=None):
                 INSERT INTO whatsapp_messages
                 (campaign_id, contact_id, phone, message, wa_message_id, direction, status, error)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (None, contact.get("id"), phone, "[Template] " + campaign["template_name"], message_id, "outgoing", status, error_text))
+            """, (cid, contact.get("id"), phone, "[Template] " + campaign["template_name"], message_id, "outgoing", status, error_text))
 
         c.execute("UPDATE template_campaigns SET status = ?, scheduled_at = scheduled_at WHERE id = ?", ("Completed", cid))
         c.commit()
