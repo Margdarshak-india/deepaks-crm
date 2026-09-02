@@ -1,0 +1,11 @@
+Render Cron Job setup
+
+Schedule (UTC): */1 * * * *
+Build Command: pip install -r requirements.txt
+Start Command: python render_cron.py
+
+Environment variables:
+APP_BASE_URL = your live Render web-service URL
+SCHEDULER_SECRET = same long random secret on web service and Cron Job
+
+The cron runs every minute and calls the authenticated scheduler endpoint. Scheduled campaign times are selected in IST and stored in UTC in PostgreSQL.
