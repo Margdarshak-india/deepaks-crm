@@ -3950,7 +3950,7 @@ def _prepare_template_campaign_send(cid, request_form=None, request_files=None):
             uploaded_media = request_files.get("header_media")
             media_path = None
 
-            if not uploaded_media and campaign.get("header_media_id"):
+            if not uploaded_media and (campaign["header_media_id"] if "header_media_id" in campaign.keys() else None):
                 header_media_id = str(campaign["header_media_id"]).strip()
                 return campaign, selected, values, header_media_id, header_media_type, None
 
