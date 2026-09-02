@@ -3944,11 +3944,16 @@ def _prepare_template_campaign_send(cid, request_form=None, request_files=None):
         header_media_id = None
         header_media_type = selected.get("header_media_type", "")
         if selected.get("has_media_header"):
+            # IMPORTANT: scheduled campaigns run from Render Cron, which is a
+            # separate process/container. Never depend on a local file at send
+            # time. A saved Meta media ID is the source of truth.
             uploaded_media = request_files.get("header_media")
             media_path = None
+
             if not uploaded_media and campaign.get("header_media_id"):
-                header_media_id = str(campaign["header_media_id"])
+                header_media_id = str(campaign["header_media_id"]).strip()
                 return campaign, selected, values, header_media_id, header_media_type, None
+
             if uploaded_media and uploaded_media.filename:
                 filename = secure_filename(uploaded_media.filename)
                 ext = os.path.splitext(filename)[1].lower()
@@ -3968,9 +3973,16 @@ def _prepare_template_campaign_send(cid, request_form=None, request_files=None):
                 if not media_path or not os.path.exists(media_path):
                     return campaign, selected, None, None, None, f"Please upload the required {header_media_type.upper()} header media before sending."
 
+            # Upload NOW (while the user is scheduling/sending) and persist the
+            # Meta media ID. The Cron worker will reuse this ID later and will
+            # not need access to the local uploaded file.
             header_media_id, media_error = upload_whatsapp_media(media_path, header_media_type)
             if not header_media_id:
                 return campaign, selected, None, None, None, f"Template header media upload failed: {media_error}"
+
+            header_media_id = str(header_media_id).strip()
+            if not header_media_id:
+                return campaign, selected, None, None, None, "Meta did not return a media ID for the uploaded header media."
 
             c.execute(
                 "UPDATE template_campaigns SET header_media_path = ?, header_image_path = ?, header_media_type = ?, header_media_id = ?, parameters = ? WHERE id = ?",
@@ -4085,6 +4097,12 @@ def send_template_campaign(cid):
         )
         if error:
             flash(error)
+            return redirect(url_for("template_campaigns"))
+
+        # A scheduled campaign must already have a Meta media ID. This prevents
+        # the separate Render Cron worker from ever trying to read a local file.
+        if selected and selected.get("has_media_header") and not media_id:
+            flash("Please upload the required IMAGE/VIDEO/DOCUMENT header media before scheduling.")
             return redirect(url_for("template_campaigns"))
 
         c = db()
