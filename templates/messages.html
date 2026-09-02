@@ -1,3 +1,203 @@
-{% extends "base.html" %}
-{% block title %}Messages - Margdarshak's CRM{% endblock %}{% block page_name %}Messages{% endblock %}
-{% block content %}<div class="heading"><h1>Messages</h1><p>Outgoing WhatsApp message activity and delivery status.</p></div><div class="card"><div class="table-wrap"><table><thead><tr><th>Time</th><th>Contact</th><th>Phone</th><th>Message</th><th>Status</th><th>Error</th></tr></thead><tbody>{% for r in rows %}<tr><td>{{ r.created_at }}</td><td>{{ r.contact_name or 'Customer' }}</td><td>{{ r.phone }}</td><td style="max-width:360px;white-space:pre-wrap;word-break:break-word">{{ r.message }}</td><td><span class="badge {% if r.status in ['accepted','sent','delivered','read'] %}success{% elif r.status=='failed' %}danger{% else %}neutral{% endif %}">{{ r.status }}</span></td><td style="max-width:350px;word-break:break-word;color:var(--danger)">{{ r.error or '' }}</td></tr>{% else %}<tr><td colspan="6" class="empty">No messages yet.</td></tr>{% endfor %}</tbody></table></div></div>{% endblock %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Messages - Deepak's CRM</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f7fb;
+            color: #172033;
+        }
+
+        nav {
+            background: #123b68;
+            padding: 18px;
+            color: white;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin-right: 20px;
+            font-size: 17px;
+        }
+
+        .container {
+            padding: 25px;
+        }
+
+        h1 {
+            font-size: 32px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 3px 15px rgba(0,0,0,0.08);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 13px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: #eef3f8;
+        }
+
+        .accepted {
+            color: #16803c;
+            font-weight: bold;
+        }
+
+        .failed {
+            color: #d62828;
+            font-weight: bold;
+        }
+
+        .status {
+            font-weight: bold;
+        }
+
+        .error {
+            color: #d62828;
+            max-width: 350px;
+            word-break: break-word;
+        }
+
+        @media(max-width: 600px) {
+            .container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 27px;
+            }
+
+            nav a {
+                display: inline-block;
+                margin-bottom: 8px;
+            }
+
+            table {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<nav>
+    <strong>📱 Deepak's CRM</strong>
+    <br><br>
+
+    <a href="{{ url_for('dashboard') }}">Dashboard</a>
+    <a href="{{ url_for('contacts') }}">Contacts</a>
+    <a href="{{ url_for('campaigns') }}">Campaigns</a>
+    <a href="{{ url_for('messages') }}">Messages</a>
+    <a href="{{ url_for('incoming') }}">Incoming</a>
+    <a href="{{ url_for('settings') }}">Settings</a>
+</nav>
+
+<div class="container">
+
+    <h1>WhatsApp Message History</h1>
+
+    <div class="card">
+
+        {% if rows %}
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Contact</th>
+                    <th>Phone</th>
+                    <th>Message</th>
+                    <th>Status</th>
+                    <th>WhatsApp ID</th>
+                    <th>Error</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+            {% for row in rows %}
+
+                <tr>
+
+                    <td>{{ row["id"] }}</td>
+
+                    <td>
+                        {{ row["contact_name"] or "Unknown" }}
+                    </td>
+
+                    <td>
+                        {{ row["phone"] }}
+                    </td>
+
+                    <td>
+                        {{ row["message"] }}
+                    </td>
+
+                    <td class="status
+                        {% if row['status'] == 'failed' %}
+                            failed
+                        {% elif row['status'] in ['sent','delivered','read','accepted'] %}
+                            accepted
+                        {% endif %}
+                    ">
+                        {{ row["status"] }}
+                    </td>
+
+                    <td>
+                        {{ row["wa_message_id"] or "-" }}
+                    </td>
+
+                    <td class="error">
+                        {{ row["error"] or "-" }}
+                    </td>
+
+                    <td class="created-time">
+                        {{ row["created_at"]|ist_datetime }} IST
+                    </td>
+
+                </tr>
+
+            {% endfor %}
+
+            </tbody>
+        </table>
+
+        {% else %}
+
+            <p>No WhatsApp messages found.</p>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+<script>
+// Refresh periodically so webhook delivery/read updates appear without manual reload.
+setTimeout(function () { window.location.reload(); }, 15000);
+</script>
+    
+</body>
+</html>
