@@ -23,7 +23,10 @@ import json
 import mimetypes
 import secrets
 
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+import threading
+import time
 from urllib.parse import urlencode
 from werkzeug.utils import secure_filename
 
@@ -46,6 +49,19 @@ app.secret_key = os.getenv(
 
 def get_env(name):
     return os.getenv(name, "").strip()
+
+def format_ist(dt):
+    if not dt:
+        return ""
+    try:
+        ist = ZoneInfo("Asia/Kolkata")
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(ist).strftime("%d %b %Y, %I:%M %p")
+    except Exception:
+        return str(dt)
+
+app.jinja_env.filters["ist_datetime"] = format_ist
 
 
 # =========================================================
@@ -223,6 +239,7 @@ def init_db():
         c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS selected_contact_ids TEXT")
         c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS manual_numbers TEXT")
         c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS typed_numbers TEXT")
+        c.execute("ALTER TABLE template_campaigns ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ")
 
         c.commit()
 
@@ -3854,7 +3871,7 @@ def template_campaigns():
         status = status_map.get(
             (row["template_name"], row["template_language"])
         )
-        if status:
+        if status and row.get("status") not in ("Scheduled", "Sending", "Completed"):
             row["status"] = (
                 "Approved" if status.upper() == "APPROVED"
                 else status.title()
@@ -3895,41 +3912,25 @@ def delete_template_campaign(cid):
     return redirect(url_for("template_campaigns"))
 
 
-@app.route("/template-campaign/<int:cid>/send", methods=["POST"])
-def send_template_campaign(cid):
+def _prepare_template_campaign_send(cid, request_form=None, request_files=None):
+    """Validate and persist send-time variables/media. Returns (campaign, selected, values, media_id, media_type, error)."""
+    request_form = request_form or {}
+    request_files = request_files or {}
     c = db()
-
     try:
-        campaign = c.execute(
-            "SELECT * FROM template_campaigns WHERE id = ?",
-            (cid,)
-        ).fetchone()
-
+        campaign = c.execute("SELECT * FROM template_campaigns WHERE id = ?", (cid,)).fetchone()
         if not campaign:
-            flash("Template campaign not found.")
-            return redirect(url_for("template_campaigns"))
+            return None, None, None, None, None, "Template campaign not found."
 
         templates, error = fetch_meta_templates()
-
         if error:
-            flash(f"Meta template check failed: {error}")
-            return redirect(url_for("template_campaigns"))
+            return campaign, None, None, None, None, f"Meta template check failed: {error}"
 
-        selected = next(
-            (
-                x for x in templates
-                if x["name"] == campaign["template_name"]
-                and x["language"] == campaign["template_language"]
-            ),
-            None
-        )
-
+        selected = next((x for x in templates if x["name"] == campaign["template_name"] and x["language"] == campaign["template_language"]), None)
         if not selected or selected["status"].upper() != "APPROVED":
-            flash("Template is not approved. Sending is disabled.")
-            return redirect(url_for("template_campaigns"))
+            return campaign, None, None, None, None, "Template is not approved. Sending is disabled."
 
-        # Send-time values/media are supplied by the inline Send dialog.
-        send_parameters = request.form.get("parameters", "").strip()
+        send_parameters = (request_form.get("parameters") or "").strip()
         if send_parameters:
             values = [x.strip() for x in send_parameters.split("||")]
         else:
@@ -3937,86 +3938,89 @@ def send_template_campaign(cid):
             values = raw_parameters.split("||") if raw_parameters else []
 
         expected_count = int(selected.get("variable_count", 0) or 0)
-        if expected_count:
-            if len(values) != expected_count or any(not x.strip() for x in values):
-                flash(
-                    f"Before sending, please fill all {expected_count} template variable(s)."
-                )
-                return redirect(url_for("template_campaigns"))
+        if expected_count and (len(values) != expected_count or any(not x.strip() for x in values)):
+            return campaign, selected, None, None, None, f"Before sending, please fill all {expected_count} template variable(s)."
 
         header_media_id = None
         header_media_type = selected.get("header_media_type", "")
-
         if selected.get("has_media_header"):
-            uploaded_media = request.files.get("header_media")
+            uploaded_media = request_files.get("header_media")
             media_path = None
-
+            if not uploaded_media and campaign.get("header_media_id"):
+                header_media_id = str(campaign["header_media_id"])
+                return campaign, selected, values, header_media_id, header_media_type, None
             if uploaded_media and uploaded_media.filename:
                 filename = secure_filename(uploaded_media.filename)
                 ext = os.path.splitext(filename)[1].lower()
                 allowed = {
                     "image": {".jpg", ".jpeg", ".png"},
                     "video": {".mp4", ".3gp"},
-                    "document": {
-                        ".pdf", ".doc", ".docx", ".xls", ".xlsx",
-                        ".ppt", ".pptx", ".txt"
-                    }
+                    "document": {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt"}
                 }
                 if not filename or ext not in allowed.get(header_media_type, set()):
-                    flash(f"Please upload a valid {header_media_type.upper()} file before sending.")
-                    return redirect(url_for("template_campaigns"))
-
+                    return campaign, selected, None, None, None, f"Please upload a valid {header_media_type.upper()} file before sending."
                 upload_dir = os.path.join("static", "uploads", "template_headers")
                 os.makedirs(upload_dir, exist_ok=True)
-                media_path = os.path.join(
-                    upload_dir, f"{secrets.token_hex(8)}_{filename}"
-                )
+                media_path = os.path.join(upload_dir, f"{secrets.token_hex(8)}_{filename}")
                 uploaded_media.save(media_path)
             else:
                 media_path = campaign["header_media_path"] or campaign["header_image_path"]
                 if not media_path or not os.path.exists(media_path):
-                    flash(f"Please upload the required {header_media_type.upper()} header media before sending.")
-                    return redirect(url_for("template_campaigns"))
+                    return campaign, selected, None, None, None, f"Please upload the required {header_media_type.upper()} header media before sending."
 
-            header_media_id, media_error = upload_whatsapp_media(
-                media_path, header_media_type
-            )
+            header_media_id, media_error = upload_whatsapp_media(media_path, header_media_type)
             if not header_media_id:
-                flash(f"Template header media upload failed: {media_error}")
-                return redirect(url_for("template_campaigns"))
+                return campaign, selected, None, None, None, f"Template header media upload failed: {media_error}"
 
             c.execute(
                 "UPDATE template_campaigns SET header_media_path = ?, header_image_path = ?, header_media_type = ?, header_media_id = ?, parameters = ? WHERE id = ?",
-                (
-                    media_path,
-                    media_path if header_media_type == "image" else campaign["header_image_path"],
-                    header_media_type,
-                    header_media_id,
-                    send_parameters or campaign["parameters"],
-                    cid
-                )
+                (media_path, media_path if header_media_type == "image" else campaign["header_image_path"], header_media_type, header_media_id, send_parameters or campaign["parameters"], cid)
             )
         elif send_parameters:
-            c.execute(
-                "UPDATE template_campaigns SET parameters = ? WHERE id = ?",
-                (send_parameters, cid)
-            )
+            c.execute("UPDATE template_campaigns SET parameters = ? WHERE id = ?", (send_parameters, cid))
+
+        c.commit()
+        campaign = c.execute("SELECT * FROM template_campaigns WHERE id = ?", (cid,)).fetchone()
+        return campaign, selected, values, header_media_id, header_media_type, None
+    except Exception as e:
+        c.rollback()
+        return None, None, None, None, None, f"Template campaign error: {e}"
+    finally:
+        c.close()
+
+
+def perform_template_campaign_send(cid):
+    """Send a saved campaign. Used by both Send Now and the persistent scheduler."""
+    campaign, selected, values, header_media_id, header_media_type, error = _prepare_template_campaign_send(cid)
+    if error:
+        c = db()
+        try:
+            c.execute("UPDATE template_campaigns SET status = ? WHERE id = ?", ("Failed", cid))
+            c.commit()
+        finally:
+            c.close()
+        return False, error
+
+    c = db()
+    try:
+        # A campaign can be claimed by only one scheduler worker.
+        c.execute("UPDATE template_campaigns SET status = ? WHERE id = ?", ("Sending", cid))
+        c.commit()
 
         recipients = template_campaign_recipients(campaign)
-
         if not recipients:
-            flash("No recipients found.")
-            return redirect(url_for("template_campaigns"))
+            c.execute("UPDATE template_campaigns SET status = ? WHERE id = ?", ("Failed", cid))
+            c.commit()
+            return False, "No recipients found."
 
+        expected_count = int(selected.get("variable_count", 0) or 0)
         sent = 0
         failed = 0
-
         for contact in recipients:
             phone = clean_phone(contact.get("phone") or "")
             if not phone:
                 failed += 1
                 continue
-
             ok, message_id, response = send_whatsapp_template(
                 phone,
                 campaign["template_name"],
@@ -4025,7 +4029,6 @@ def send_template_campaign(cid):
                 header_media_id=header_media_id,
                 header_media_type=header_media_type
             )
-
             if ok:
                 status = "accepted"
                 error_text = None
@@ -4033,48 +4036,180 @@ def send_template_campaign(cid):
             else:
                 status = "failed"
                 failed += 1
-                error_text = (
-                    json.dumps(response, ensure_ascii=False)
-                    if isinstance(response, (dict, list))
-                    else str(response)
-                )
+                error_text = json.dumps(response, ensure_ascii=False) if isinstance(response, (dict, list)) else str(response)
 
             c.execute("""
                 INSERT INTO whatsapp_messages
-                (campaign_id, contact_id, phone, message,
-                 wa_message_id, direction, status, error)
+                (campaign_id, contact_id, phone, message, wa_message_id, direction, status, error)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                None,
-                contact.get("id"),
-                phone,
-                "[Template] " + campaign["template_name"],
-                message_id,
-                "outgoing",
-                status,
-                error_text
-            ))
+            """, (None, contact.get("id"), phone, "[Template] " + campaign["template_name"], message_id, "outgoing", status, error_text))
 
-        c.execute(
-            "UPDATE template_campaigns SET status = ? WHERE id = ?",
-            (f"Sent {sent}, Failed {failed}", cid)
-        )
-
+        c.execute("UPDATE template_campaigns SET status = ?, scheduled_at = scheduled_at WHERE id = ?", ("Completed", cid))
         c.commit()
-
-        flash(
-            f"Template campaign finished: "
-            f"{sent} accepted, {failed} failed."
-        )
-
+        return True, f"Template campaign completed: {sent} accepted, {failed} failed."
     except Exception as e:
         c.rollback()
-        flash(f"Template campaign error: {e}")
-
+        try:
+            c.execute("UPDATE template_campaigns SET status = ? WHERE id = ?", ("Failed", cid))
+            c.commit()
+        except Exception:
+            c.rollback()
+        return False, f"Template campaign error: {e}"
     finally:
         c.close()
 
+
+@app.route("/template-campaign/<int:cid>/send", methods=["POST"])
+def send_template_campaign(cid):
+    mode = (request.form.get("send_mode") or "now").strip().lower()
+
+    if mode == "schedule":
+        scheduled_raw = (request.form.get("scheduled_at") or "").strip()
+        if not scheduled_raw:
+            flash("Please select a date and time for scheduled send.")
+            return redirect(url_for("template_campaigns"))
+        try:
+            # datetime-local is interpreted as India Standard Time (IST).
+            ist = ZoneInfo("Asia/Kolkata")
+            local_dt = datetime.strptime(scheduled_raw, "%Y-%m-%dT%H:%M").replace(tzinfo=ist)
+            if local_dt <= datetime.now(ist):
+                flash("Scheduled date and time must be in the future.")
+                return redirect(url_for("template_campaigns"))
+            scheduled_utc = local_dt.astimezone(timezone.utc)
+        except Exception:
+            flash("Invalid scheduled date/time.")
+            return redirect(url_for("template_campaigns"))
+
+        campaign, selected, values, media_id, media_type, error = _prepare_template_campaign_send(
+            cid, request.form, request.files
+        )
+        if error:
+            flash(error)
+            return redirect(url_for("template_campaigns"))
+
+        c = db()
+        try:
+            c.execute("UPDATE template_campaigns SET status = ?, scheduled_at = ? WHERE id = ?", ("Scheduled", scheduled_utc, cid))
+            c.commit()
+            flash("Campaign scheduled successfully. It will send automatically at the selected IST time.")
+        except Exception as e:
+            c.rollback()
+            flash(f"Schedule error: {e}")
+        finally:
+            c.close()
+        return redirect(url_for("template_campaigns"))
+
+    ok, message = perform_template_campaign_send(cid)
+    flash(message)
     return redirect(url_for("template_campaigns"))
+
+
+# ---------------------------------------------------------
+# PERSISTENT TEMPLATE CAMPAIGN SCHEDULER
+# ---------------------------------------------------------
+
+def process_due_template_campaigns():
+    """Claim and send due campaigns. DB-backed so a restart does not lose schedules."""
+    while True:
+        try:
+            c = db()
+            try:
+                row = c.execute("""
+                    SELECT id FROM template_campaigns
+                    WHERE status = 'Scheduled'
+                      AND scheduled_at IS NOT NULL
+                      AND scheduled_at <= NOW()
+                    ORDER BY scheduled_at ASC
+                    FOR UPDATE SKIP LOCKED
+                    LIMIT 1
+                """).fetchone()
+                if row:
+                    c.execute("UPDATE template_campaigns SET status = ? WHERE id = ?", ("Sending", row["id"]))
+                    c.commit()
+                    cid = row["id"]
+                else:
+                    c.commit()
+                    cid = None
+            finally:
+                c.close()
+
+            if cid is not None:
+                # perform_template_campaign_send will keep the status Sending and finish it.
+                perform_template_campaign_send(cid)
+            else:
+                time.sleep(20)
+        except Exception as e:
+            print(f"Template scheduler error: {e}")
+            time.sleep(30)
+
+
+def process_due_template_campaigns_once():
+    """Process all campaigns currently due. Intended for Render Cron Jobs."""
+    processed = []
+    while True:
+        c = None
+        try:
+            c = db()
+            row = c.execute("""
+                SELECT id FROM template_campaigns
+                WHERE status = 'Scheduled'
+                  AND scheduled_at IS NOT NULL
+                  AND scheduled_at <= NOW()
+                ORDER BY scheduled_at ASC
+                FOR UPDATE SKIP LOCKED
+                LIMIT 1
+            """).fetchone()
+            if not row:
+                c.commit(); break
+            cid = row["id"]
+            c.execute("UPDATE template_campaigns SET status = ? WHERE id = ? AND status = 'Scheduled'", ("Sending", cid))
+            c.commit()
+        except Exception as e:
+            if c:
+                try: c.rollback()
+                except Exception: pass
+            print(f"Scheduled campaign claim error: {e}"); break
+        finally:
+            if c:
+                c.close()
+        ok, message = perform_template_campaign_send(cid)
+        processed.append({"id": cid, "ok": ok, "message": message})
+    return processed
+
+
+def start_template_scheduler():
+    t = threading.Thread(target=process_due_template_campaigns, name="template-campaign-scheduler", daemon=True)
+    t.start()
+
+
+@app.route("/api/template-campaigns/scheduled")
+def scheduled_template_campaigns_api():
+    c = db()
+    try:
+        rows = c.execute("""
+            SELECT id, name, status, scheduled_at
+            FROM template_campaigns
+            WHERE scheduled_at IS NOT NULL
+            ORDER BY scheduled_at DESC
+            LIMIT 100
+        """).fetchall()
+        return jsonify({"campaigns": [dict(r) for r in rows]})
+    finally:
+        c.close()
+
+
+@app.route("/internal/run-scheduled-campaigns", methods=["POST", "GET"])
+def run_scheduled_campaigns_internal():
+    """Authenticated endpoint for an external scheduler such as Render Cron."""
+    supplied = request.headers.get("X-Scheduler-Secret", "") or request.args.get("secret", "")
+    expected = os.getenv("SCHEDULER_SECRET", "").strip()
+    if not expected or not hmac.compare_digest(supplied, expected):
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+    results = process_due_template_campaigns_once()
+    return jsonify({"ok": True, "processed": results})
+
+
+start_template_scheduler()
 
 
 if __name__ == "__main__":
